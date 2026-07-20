@@ -469,10 +469,10 @@ window.__libsReady = Promise.all([
               <thead>
                 <tr>
                   <th>Customer</th><th>Phone</th><th>Agent</th><th>Assignment</th>
-                  <th>Call Status</th><th>Status Updated</th><th>Follow-up / Close</th><th>Credit Limit</th><th>Contact Date</th>
+                  <th>Call Status</th><th>Status Updated</th><th>Follow-up / Close</th><th>Credit Limit</th><th>Contact Date</th><th>Created</th>
                 </tr>
               </thead>
-              <tbody id="tableBody"><tr class="empty-row"><td colspan="9">Loading leads…</td></tr></tbody>
+              <tbody id="tableBody"><tr class="empty-row"><td colspan="10">Loading leads…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -1119,7 +1119,7 @@ function getFilteredLeads(){
 function renderTable(){
   const tbody = document.getElementById('tableBody');
   const rows = getFilteredLeads();
-  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No leads match your filters.</td></tr>'; return; }
+  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No leads match your filters.</td></tr>'; return; }
   tbody.innerHTML = rows.map(l => {
     const status = l['CALL STATUS'] || 'Not Contacted';
     const color = STATUS_COLORS[status] || '#8B96A5';
@@ -1133,6 +1133,7 @@ function renderTable(){
       <td>${escapeHtml(l['FOLLOW - UP DATE / CLOSE DATE'] || '—')}</td>
       <td class="mono">${formatMoney(l['Credit Limit'])}</td>
       <td>${escapeHtml(l['CONTACT DATE'] || '—')}</td>
+      <td>${escapeHtml(formatDateTime(l['Created_at']))}</td>
     </tr>`;
   }).join('');
   tbody.querySelectorAll('tr[data-row]').forEach(tr => {
