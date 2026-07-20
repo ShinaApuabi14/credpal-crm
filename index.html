@@ -469,10 +469,10 @@ window.__libsReady = Promise.all([
               <thead>
                 <tr>
                   <th>Customer</th><th>Phone</th><th>Agent</th><th>Assignment</th>
-                  <th>Call Status</th><th>Follow-up / Close</th><th>Credit Limit</th><th>Contact Date</th>
+                  <th>Call Status</th><th>Status Updated</th><th>Follow-up / Close</th><th>Credit Limit</th><th>Contact Date</th>
                 </tr>
               </thead>
-              <tbody id="tableBody"><tr class="empty-row"><td colspan="8">Loading leads…</td></tr></tbody>
+              <tbody id="tableBody"><tr class="empty-row"><td colspan="9">Loading leads…</td></tr></tbody>
             </table>
           </div>
         </div>
@@ -613,12 +613,16 @@ window.__libsReady = Promise.all([
           <div class="field"><label>Contact Date</label><input type="date" name="CONTACT DATE" /></div>
           <div class="field">
             <label>Call Status</label>
-            <select name="CALL STATUS">
+            <select name="CALL STATUS" id="leadCallStatusSelect">
               <option value="">Not Contacted</option>
               <option>Answered - Interested</option><option>Answered - Not Interested</option>
               <option>No Answer</option><option>Switched Off / Unreachable</option>
               <option>Wrong Number</option><option>Call Back Later</option><option>Converted</option>
             </select>
+          </div>
+          <div class="field">
+            <label>Status Updated At</label>
+            <input type="datetime-local" name="Status Updated At" id="leadStatusUpdatedInput" />
           </div>
           <div class="field"><label>Follow-up / Close Date</label><input type="date" name="FOLLOW - UP DATE / CLOSE DATE" /></div>
           <div class="field full"><label>Feedback</label><textarea name="FEED BACK"></textarea></div>
@@ -687,7 +691,7 @@ const CONFIG = { webAppUrl: localStorage.getItem('crmWebAppUrl') || '' };
 
 const LEAD_HEADERS = [
   'ASSIGNMENTS','Agents','User_ID','Customer Name','Phone Number','Email','Salary','Credit Limit',
-  'Selfie Verified At','Created_at','CONTACT DATE','CALL STATUS','FEED BACK','NOTE','FOLLOW - UP DATE / CLOSE DATE'
+  'Selfie Verified At','Created_at','CONTACT DATE','CALL STATUS','Status Updated At','FEED BACK','NOTE','FOLLOW - UP DATE / CLOSE DATE'
 ];
 const IMPORTABLE_HEADERS = LEAD_HEADERS.filter(h => h !== 'Created_at');
 
@@ -699,12 +703,16 @@ const STATUS_COLORS = {
 };
 const ASSIGNMENTS = ['Retention MOM','Net User Utilization','Not Tokenization','User Activation'];
 
+const INACTIVITY_LIMIT_MS = 10 * 60 * 1000; // 10 minutes
+
 /* ============ STATE ============ */
 let leads = [], agents = [], roles = [];
 let currentView = 'home', currentLeadSub = 'table';
 let editingLeadRow = null, editingAgentRow = null, editingRoleRow = null;
+let editingLeadOriginalStatus = null;
 let csvRows = [], csvHeaders = [], columnMapping = {};
 let charts = {};
+let inactivityTimer = null;
 let session = null;
 try{ session = JSON.parse(localStorage.getItem('crmSession') || 'null'); }catch(e){ session = null; }
 
@@ -722,11 +730,13 @@ document.addEventListener('DOMContentLoaded', () => {
   bindSettingsEvents();
   bindImportEvents();
   bindAuthEvents();
+  bindSessionGuards();
 
   if (session && session.Email){
     hideAuthScreen();
     updateSidebarUser();
     loadAll();
+    resetInactivityTimer();
   } else {
     showAuthScreen();
   }
@@ -737,6 +747,33 @@ async function loadAll(){
   populateDropdowns();
   renderCurrentView();
 }
+
+/* ============ SESSION GUARDS: close-window + inactivity logout ============ */
+function bindSessionGuards(){
+  // Log out when the tab/window is closed (also fires on refresh/navigation,
+  // which is an accepted tradeoff of relying on beforeunload).
+  window.addEventListener('beforeunload', () => {
+    if (session) localStorage.removeItem('crmSession');
+  });
+
+  ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(evt => {
+    document.addEventListener(evt, resetInactivityTimer, { passive: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') resetInactivityTimer();
+  });
+}
+
+function resetInactivityTimer(){
+  if (!session) return;
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(() => {
+    if (!session) return;
+    logout();
+    showAuthError('You were logged out after 10 minutes of inactivity.');
+  }, INACTIVITY_LIMIT_MS);
+}
+function stopInactivityTimer(){ clearTimeout(inactivityTimer); inactivityTimer = null; }
 
 /* ============ AUTH ============ */
 function bindAuthEvents(){
@@ -808,6 +845,7 @@ async function handleLogin(){
     hideAuthScreen();
     updateSidebarUser();
     await loadAll();
+    resetInactivityTimer();
     showToast('Welcome back, ' + (session.Name || session.Email));
   }catch(err){ showAuthError(err.message || 'Could not sign in'); }
   finally{ btn.disabled = false; btn.textContent = 'Sign in'; }
@@ -834,6 +872,7 @@ async function handleSignup(){
     hideAuthScreen();
     updateSidebarUser();
     await loadAll();
+    resetInactivityTimer();
     showToast('Account created — welcome, ' + (session.Name || session.Email));
   }catch(err){ showAuthError(err.message || 'Could not create account'); }
   finally{ btn.disabled = false; btn.textContent = 'Create account'; }
@@ -841,6 +880,7 @@ async function handleSignup(){
 
 function logout(){
   session = null;
+  stopInactivityTimer();
   localStorage.removeItem('crmSession');
   document.getElementById('authLoginEmail').value = '';
   document.getElementById('authLoginPassword').value = '';
@@ -1079,7 +1119,7 @@ function getFilteredLeads(){
 function renderTable(){
   const tbody = document.getElementById('tableBody');
   const rows = getFilteredLeads();
-  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No leads match your filters.</td></tr>'; return; }
+  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No leads match your filters.</td></tr>'; return; }
   tbody.innerHTML = rows.map(l => {
     const status = l['CALL STATUS'] || 'Not Contacted';
     const color = STATUS_COLORS[status] || '#8B96A5';
@@ -1089,6 +1129,7 @@ function renderTable(){
       <td>${escapeHtml(shortAgent(l['Agents']))}</td>
       <td>${escapeHtml(l['ASSIGNMENTS'] || '—')}</td>
       <td><span class="status-pill" style="color:${color}; background:${color}22;">${escapeHtml(status)}</span></td>
+      <td>${escapeHtml(formatDateTime(l['Status Updated At']))}</td>
       <td>${escapeHtml(l['FOLLOW - UP DATE / CLOSE DATE'] || '—')}</td>
       <td class="mono">${formatMoney(l['Credit Limit'])}</td>
       <td>${escapeHtml(l['CONTACT DATE'] || '—')}</td>
@@ -1114,6 +1155,7 @@ function renderKanban(){
         ${cards.map(l => `<div class="kcard" draggable="true" data-row="${l.row}">
           <div class="kname">${escapeHtml(l['Customer Name'] || 'Unnamed')}</div>
           <div class="kmeta"><span>${escapeHtml(l['Phone Number'] || '—')}</span><span>${escapeHtml(shortAgent(l['Agents']))}</span>
+          ${l['Status Updated At'] ? `<span>Updated: ${escapeHtml(formatDateTime(l['Status Updated At']))}</span>` : ''}
           ${l['FOLLOW - UP DATE / CLOSE DATE'] ? `<span>Follow-up: ${escapeHtml(l['FOLLOW - UP DATE / CLOSE DATE'])}</span>` : ''}</div>
           <span class="kbadge">${escapeHtml(l['ASSIGNMENTS'] || '—')}</span>
         </div>`).join('')}
@@ -1140,9 +1182,14 @@ function renderKanban(){
       const newStatus = col.dataset.status;
       const lead = leads.find(l => l.row === row);
       if (!lead || lead['CALL STATUS'] === newStatus) return;
+      const stamp = nowForDatetimeLocal();
       lead['CALL STATUS'] = newStatus;
+      lead['Status Updated At'] = stamp;
       renderKanban();
-      try{ await apiPost({type:'leads', action:'update', row, data:{'CALL STATUS': newStatus}}); showToast(`Moved to "${newStatus}"`); }
+      try{
+        await apiPost({type:'leads', action:'update', row, data:{'CALL STATUS': newStatus, 'Status Updated At': stamp}});
+        showToast(`Moved to "${newStatus}"`);
+      }
       catch(err){ showToast('Could not update status: ' + err.message, true); loadLeads().then(renderKanban); }
     });
   });
@@ -1151,6 +1198,11 @@ function renderKanban(){
 /* ============ LEAD MODAL ============ */
 function bindLeadEvents(){
   document.getElementById('saveLeadBtn').addEventListener('click', saveLead);
+  // Default "Status Updated At" to now whenever the call status is changed in the form —
+  // the field stays editable so this can still be overridden before saving.
+  document.getElementById('leadCallStatusSelect').addEventListener('change', () => {
+    document.getElementById('leadStatusUpdatedInput').value = nowForDatetimeLocal();
+  });
   bindModalClosers();
 }
 function bindModalClosers(){
@@ -1165,6 +1217,7 @@ function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 
 function openLeadModal(lead){
   editingLeadRow = lead ? lead.row : null;
+  editingLeadOriginalStatus = lead ? (lead['CALL STATUS'] || 'Not Contacted') : null;
   document.getElementById('leadModalTitle').textContent = lead ? 'Edit Lead' : 'New Lead';
   const form = document.getElementById('leadForm');
   form.reset();
@@ -1187,6 +1240,13 @@ async function saveLead(){
   const data = {};
   new FormData(form).forEach((v,k) => data[k] = v);
   if (!data['CALL STATUS']) data['CALL STATUS'] = 'Not Contacted';
+
+  // Default "Status Updated At" to now if the call status changed (new lead, or edited)
+  // and the field was left blank — it's always editable, this is just the default.
+  const statusChanged = editingLeadOriginalStatus === null || data['CALL STATUS'] !== editingLeadOriginalStatus;
+  if (statusChanged && !data['Status Updated At']){
+    data['Status Updated At'] = nowForDatetimeLocal();
+  }
 
   const btn = document.getElementById('saveLeadBtn');
   btn.disabled = true; btn.textContent = 'Saving…';
@@ -1425,6 +1485,7 @@ async function runImport(){
     const obj = {};
     mappedTargets.forEach(t => { obj[t] = (row[columnMapping[t]] ?? '').toString(); });
     if (!obj['CALL STATUS']) obj['CALL STATUS'] = 'Not Contacted';
+    if (!obj['Status Updated At']) obj['Status Updated At'] = nowForDatetimeLocal();
     if (!obj['Agents'] && defaultAgent) obj['Agents'] = defaultAgent;
     return obj;
   });
@@ -1498,6 +1559,14 @@ function toDatetimeLocal(value){
   const d = new Date(value); if (isNaN(d.getTime())) return '';
   const pad = n => n.toString().padStart(2,'0');
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function nowForDatetimeLocal(){ return toDatetimeLocal(new Date()); }
+function formatDateTime(value){
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const pad = n => n.toString().padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function editIcon(){ return '<svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>'; }
 function trashIcon(){ return '<svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'; }
