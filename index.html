@@ -263,82 +263,157 @@ window.__libsReady = Promise.all([
   }
 
   /* ---------- auth screen ---------- */
-  .auth-screen{position:fixed; inset:0; background:var(--bg); z-index:300; display:none; align-items:center; justify-content:center; padding:20px; overflow-y:auto;}
+  .auth-screen{
+    position:fixed; inset:0; z-index:300; display:none; align-items:center; justify-content:center; padding:28px; overflow-y:auto;
+    background:radial-gradient(1100px 700px at 20% 15%, #3a3548 0%, #24212e 55%, #17151d 100%);
+  }
   .auth-screen.open{display:flex;}
-  .auth-card{width:100%; max-width:400px; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:30px 28px; margin:auto;}
-  .auth-brand{display:flex; align-items:center; gap:10px; margin-bottom:24px;}
-  .auth-brand .mark{width:32px; height:32px; border-radius:8px; background:var(--accent); display:flex; align-items:center; justify-content:center; color:#04140F; font-weight:800; font-size:14px; flex-shrink:0;}
-  .auth-brand h1{font-size:15px; font-weight:700; line-height:1.2;}
-  .auth-brand .sub{font-size:11.5px; color:var(--text-dim);}
-  .auth-tabs{display:flex; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:3px; margin-bottom:20px;}
-  .auth-tabs button{flex:1; background:transparent; border:none; color:var(--text-dim); font-size:13px; font-weight:500; padding:8px; border-radius:6px;}
-  .auth-tabs button.active{background:var(--accent-dim); color:var(--accent);}
+
+  .auth-shell{
+    display:flex; width:100%; max-width:920px; min-height:0; margin:auto;
+    background:var(--surface); border:1px solid var(--border); border-radius:20px; overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,0.5);
+  }
+
+  .auth-visual{
+    position:relative; width:360px; flex-shrink:0; display:flex; flex-direction:column; justify-content:space-between;
+    padding:22px; color:#fff; background:#1c1a24 url('rdBbW.jpg') center/cover no-repeat;
+  }
+  .auth-visual::after{
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(180deg, rgba(10,8,18,0.1) 0%, rgba(10,8,18,0.05) 38%, rgba(10,8,18,0.85) 100%);
+  }
+  .auth-visual-top, .auth-visual-bottom{position:relative; z-index:1;}
+  .auth-visual-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .auth-visual-brand{display:flex; align-items:center; gap:8px; font-weight:800; font-size:14px; letter-spacing:.03em;}
+  .auth-visual-brand .mark{
+    width:28px; height:28px; border-radius:8px; background:rgba(255,255,255,0.14); backdrop-filter:blur(6px);
+    border:1px solid rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:800;
+  }
+  .auth-visual-badge{
+    font-size:11px; font-weight:500; padding:6px 12px; border-radius:20px; white-space:nowrap;
+    background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.25); backdrop-filter:blur(6px);
+  }
+  .auth-visual-bottom .headline{font-size:19px; font-weight:600; line-height:1.35; margin-bottom:16px;}
+  .auth-dots{display:flex; gap:6px;}
+  .auth-dots span{width:14px; height:4px; border-radius:3px; background:rgba(255,255,255,0.35);}
+  .auth-dots span.active{width:22px; background:#fff;}
+
+  .auth-panel{flex:1; min-width:0; padding:38px 42px; display:flex; flex-direction:column; justify-content:center; overflow-y:auto; max-height:88vh;}
+  .auth-panel h2{font-size:21px; font-weight:700; margin-bottom:6px;}
+  .auth-switch{font-size:12.5px; color:var(--text-dim); margin-bottom:22px;}
+  .auth-link-btn{background:none; border:none; padding:0; margin:0; color:var(--accent); font-weight:600; font-size:inherit; font-family:inherit; cursor:pointer;}
+  .auth-link-btn:hover{text-decoration:underline;}
+
   .auth-form{display:flex; flex-direction:column; gap:13px;}
   .auth-form .field input, .auth-form .field select{width:100%;}
-  .auth-error{font-size:12.5px; color:var(--danger); background:var(--danger-dim); border:1px solid rgba(255,107,107,0.3); padding:9px 11px; border-radius:8px; display:none;}
+  .auth-error{font-size:12.5px; color:var(--danger); background:var(--danger-dim); border:1px solid rgba(255,107,107,0.3); padding:9px 11px; border-radius:8px; display:none; margin-bottom:14px;}
   .auth-error.show{display:block;}
   .auth-form .btn{width:100%; justify-content:center; margin-top:4px;}
+  .auth-name-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+
+  .pw-wrap{position:relative;}
+  .pw-wrap input{width:100%; padding-right:38px;}
+  .pw-eye{position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-faint); padding:6px; display:flex; align-items:center; justify-content:center;}
+  .pw-eye:hover{color:var(--text);}
+  .pw-eye svg{width:16px; height:16px;}
+  .pw-eye .eye-off{display:none;}
+  .pw-eye.showing .eye-on{display:none;}
+  .pw-eye.showing .eye-off{display:block;}
+
   .auth-conn-toggle{font-size:11.5px; color:var(--text-faint); background:none; border:none; margin-top:18px; text-decoration:underline; text-underline-offset:2px;}
   .auth-conn-panel{display:none; margin-top:12px; padding-top:14px; border-top:1px solid var(--border);}
   .auth-conn-panel.open{display:block;}
   .auth-conn-panel label{display:block; font-size:11.5px; color:var(--text-dim); margin-bottom:6px;}
   .auth-conn-panel input{width:100%; margin-bottom:8px;}
   .auth-hint{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+
+  @media (max-width:760px){
+    .auth-visual{display:none;}
+    .auth-shell{border-radius:16px;}
+    .auth-panel{padding:30px 22px;}
+  }
 </style>
 </head>
 <body>
 
 <!-- ===== AUTH SCREEN ===== -->
 <div class="auth-screen" id="authScreen">
-  <div class="auth-card">
-    <div class="auth-brand">
-      <div class="mark">CP</div>
-      <div>
-        <h1>Telesales CRM</h1>
-        <div class="sub">CredPal Platform</div>
+  <div class="auth-shell">
+
+    <div class="auth-visual">
+      <div class="auth-visual-top">
+        <div class="auth-visual-brand"><span class="mark">CP</span> Telesales CRM</div>
+        <div class="auth-visual-badge">CredPal Platform</div>
+      </div>
+      <div class="auth-visual-bottom">
+        <div class="headline">Track every lead,<br>close every deal.</div>
+        <div class="auth-dots"><span></span><span></span><span class="active"></span></div>
       </div>
     </div>
 
-    <div class="auth-tabs">
-      <button id="authTabLogin" class="active" type="button">Log in</button>
-      <button id="authTabSignup" type="button">Sign up</button>
+    <div class="auth-panel">
+      <div class="auth-panel-inner">
+        <h2 id="authHeading">Log in</h2>
+        <p class="auth-switch" id="authSwitchLogin">Don't have an account? <button type="button" class="auth-link-btn" id="authTabSignup">Sign up</button></p>
+        <p class="auth-switch" id="authSwitchSignup" style="display:none;">Already have an account? <button type="button" class="auth-link-btn" id="authTabLogin">Log in</button></p>
+
+        <div class="auth-error" id="authError"></div>
+
+        <form class="auth-form" id="authLoginForm" onsubmit="return false;">
+          <div class="field"><label>Email</label><input type="email" id="authLoginEmail" autocomplete="username" required /></div>
+          <div class="field">
+            <label>Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="authLoginPassword" autocomplete="current-password" required />
+              <button type="button" class="pw-eye" data-target="authLoginPassword" aria-label="Show password"><svg class="icon eye-on" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a20.6 20.6 0 0 1-2.63 3.68"/><path d="M1 1l22 22"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/></svg></button>
+            </div>
+          </div>
+          <button class="btn" id="authLoginBtn" type="button">Sign in</button>
+        </form>
+
+        <form class="auth-form" id="authSignupForm" style="display:none;" onsubmit="return false;">
+          <div class="field"><label>Full name</label><input type="text" id="authSignupName" autocomplete="name" required /></div>
+          <div class="field"><label>Work email</label><input type="email" id="authSignupEmail" autocomplete="username" required /></div>
+          <div class="field">
+            <label>Account type</label>
+            <select id="authSignupRole">
+              <option value="Agent" selected>Agent</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="field" id="authAdminCodeField" style="display:none;">
+            <label>Admin invite code</label>
+            <input type="password" id="authAdminCode" autocomplete="off" />
+            <div class="auth-hint">Ask your CRM administrator for this code.</div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="authSignupPassword" autocomplete="new-password" required />
+              <button type="button" class="pw-eye" data-target="authSignupPassword" aria-label="Show password"><svg class="icon eye-on" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a20.6 20.6 0 0 1-2.63 3.68"/><path d="M1 1l22 22"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/></svg></button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Confirm password</label>
+            <div class="pw-wrap">
+              <input type="password" id="authSignupConfirm" autocomplete="new-password" required />
+              <button type="button" class="pw-eye" data-target="authSignupConfirm" aria-label="Show password"><svg class="icon eye-on" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a20.6 20.6 0 0 1-2.63 3.68"/><path d="M1 1l22 22"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/></svg></button>
+            </div>
+          </div>
+          <div class="auth-hint">Use at least 6 characters. This becomes your login for the CRM, and your email will appear automatically in the Agent list.</div>
+          <button class="btn" id="authSignupBtn" type="button">Create account</button>
+        </form>
+
+        <button class="auth-conn-toggle" id="authConnToggle" type="button">⚙ Configure Google Sheet connection</button>
+        <div class="auth-conn-panel" id="authConnPanel">
+          <label>Apps Script Web App URL</label>
+          <input type="url" id="authConnUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" />
+          <button class="btn secondary small" id="authConnSaveBtn" type="button">Save connection</button>
+        </div>
+      </div>
     </div>
 
-    <div class="auth-error" id="authError"></div>
-
-    <form class="auth-form" id="authLoginForm" onsubmit="return false;">
-      <div class="field"><label>Email</label><input type="email" id="authLoginEmail" autocomplete="username" required /></div>
-      <div class="field"><label>Password</label><input type="password" id="authLoginPassword" autocomplete="current-password" required /></div>
-      <button class="btn" id="authLoginBtn" type="button">Sign in</button>
-    </form>
-
-    <form class="auth-form" id="authSignupForm" style="display:none;" onsubmit="return false;">
-      <div class="field"><label>Full name</label><input type="text" id="authSignupName" autocomplete="name" required /></div>
-      <div class="field"><label>Work email</label><input type="email" id="authSignupEmail" autocomplete="username" required /></div>
-      <div class="field">
-        <label>Account type</label>
-        <select id="authSignupRole">
-          <option value="Agent" selected>Agent</option>
-          <option value="Admin">Admin</option>
-        </select>
-      </div>
-      <div class="field" id="authAdminCodeField" style="display:none;">
-        <label>Admin invite code</label>
-        <input type="password" id="authAdminCode" autocomplete="off" />
-        <div class="auth-hint">Ask your CRM administrator for this code.</div>
-      </div>
-      <div class="field"><label>Password</label><input type="password" id="authSignupPassword" autocomplete="new-password" required /></div>
-      <div class="field"><label>Confirm password</label><input type="password" id="authSignupConfirm" autocomplete="new-password" required /></div>
-      <div class="auth-hint">Use at least 6 characters. This becomes your login for the CRM, and your email will appear automatically in the Agent list.</div>
-      <button class="btn" id="authSignupBtn" type="button">Create account</button>
-    </form>
-
-    <button class="auth-conn-toggle" id="authConnToggle" type="button">⚙ Configure Google Sheet connection</button>
-    <div class="auth-conn-panel" id="authConnPanel">
-      <label>Apps Script Web App URL</label>
-      <input type="url" id="authConnUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" />
-      <button class="btn secondary small" id="authConnSaveBtn" type="button">Save connection</button>
-    </div>
   </div>
 </div>
 
@@ -780,6 +855,15 @@ function bindAuthEvents(){
   document.getElementById('authTabLogin').addEventListener('click', () => switchAuthTab('login'));
   document.getElementById('authTabSignup').addEventListener('click', () => switchAuthTab('signup'));
   document.getElementById('authSignupRole').addEventListener('change', toggleAdminCodeField);
+  document.querySelectorAll('.pw-eye').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.target);
+      if (!input) return;
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.classList.toggle('showing', !showing);
+    });
+  });
   document.getElementById('authLoginBtn').addEventListener('click', handleLogin);
   document.getElementById('authSignupBtn').addEventListener('click', handleSignup);
   document.getElementById('logoutBtn').addEventListener('click', logout);
@@ -804,8 +888,9 @@ function bindAuthEvents(){
 }
 
 function switchAuthTab(tab){
-  document.getElementById('authTabLogin').classList.toggle('active', tab === 'login');
-  document.getElementById('authTabSignup').classList.toggle('active', tab === 'signup');
+  document.getElementById('authHeading').textContent = tab === 'login' ? 'Log in' : 'Create an account';
+  document.getElementById('authSwitchLogin').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('authSwitchSignup').style.display = tab === 'signup' ? 'block' : 'none';
   document.getElementById('authLoginForm').style.display = tab === 'login' ? 'flex' : 'none';
   document.getElementById('authSignupForm').style.display = tab === 'signup' ? 'flex' : 'none';
   hideAuthError();
