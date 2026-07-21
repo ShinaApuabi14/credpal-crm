@@ -3,9 +3,39 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>CredPal CRM — Sign In</title>
+<title>CredPal CRM Platform — CredPal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+function loadScriptWithFallback(primary, fallback, name){
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = primary;
+    s.onload = () => resolve(name + ' loaded (primary)');
+    s.onerror = () => {
+      console.warn(name + ' failed from primary CDN, trying fallback…');
+      const s2 = document.createElement('script');
+      s2.src = fallback;
+      s2.onload = () => resolve(name + ' loaded (fallback)');
+      s2.onerror = () => reject(new Error(name + ' failed to load from both CDNs'));
+      document.head.appendChild(s2);
+    };
+    document.head.appendChild(s);
+  });
+}
+window.__libsReady = Promise.all([
+  loadScriptWithFallback(
+    'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js',
+    'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js',
+    'Chart.js'
+  ),
+  loadScriptWithFallback(
+    'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js',
+    'https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js',
+    'PapaParse'
+  )
+]).catch(err => { window.__libsError = err.message; console.error(err); });
+</script>
 <style>
   :root{
     --bg:#0B0E13;
@@ -20,525 +50,1643 @@
     --accent-dim:rgba(0,212,160,0.14);
     --danger:#FF6B6B;
     --danger-dim:rgba(255,107,107,0.14);
-    --purple:#7B5BF5;
-    --purple-dim:rgba(123,91,245,0.14);
-    --purple-glow:rgba(123,91,245,0.25);
+    --warning:#FFB84D;
+    --info:#5B9DFF;
     --radius:10px;
+    --sidebar-w:230px;
   }
   *{box-sizing:border-box; margin:0; padding:0;}
   html,body{height:100%;}
   body{
-    background:radial-gradient(900px 600px at 15% 20%, rgba(58,31,107,0.25) 0%, transparent 60%),
-                radial-gradient(700px 500px at 85% 80%, rgba(0,212,160,0.08) 0%, transparent 50%),
-                var(--bg);
-    color:var(--text);
+    background:var(--bg); color:var(--text);
     font-family:'Inter',system-ui,-apple-system,sans-serif;
     font-size:14px; line-height:1.5;
-    display:flex; align-items:center; justify-content:center;
-    min-height:100vh; padding:20px;
+  }
+  .mono{font-family:'JetBrains Mono',monospace;}
+  svg.icon{width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0;}
+  button{font-family:inherit; cursor:pointer;}
+
+  /* ---------- shell ---------- */
+  .app-shell{display:flex; min-height:100vh;}
+
+  .sidebar{
+    width:var(--sidebar-w); flex-shrink:0; background:var(--surface); border-right:1px solid var(--border);
+    display:flex; flex-direction:column; position:sticky; top:0; height:100vh;
+  }
+  .sidebar-brand{display:flex; align-items:center; gap:10px; padding:20px 18px 16px;}
+  .sidebar-brand .mark{width:30px; height:30px; border-radius:8px; background:var(--accent); display:flex; align-items:center; justify-content:center; color:#04140F; font-weight:800; font-size:13px;}
+  .sidebar-brand h1{font-size:14px; font-weight:700; line-height:1.2;}
+  .sidebar-brand .sub{font-size:11px; color:var(--text-dim);}
+
+  .sidebar-nav{flex:1; padding:8px 12px; display:flex; flex-direction:column; gap:2px; overflow-y:auto;}
+  .nav-label{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-faint); font-weight:600; padding:14px 10px 6px;}
+  .nav-item{
+    display:flex; align-items:center; gap:11px; padding:9px 11px; border-radius:8px; border:none;
+    background:transparent; color:var(--text-dim); font-size:13.5px; font-weight:500; text-align:left; width:100%;
+    transition:all .12s;
+  }
+  .nav-item:hover{background:var(--surface-2); color:var(--text);}
+  .nav-item.active{background:var(--accent-dim); color:var(--accent);}
+  .nav-item .badge{margin-left:auto; font-size:11px; background:var(--surface-3); color:var(--text-dim); padding:1px 7px; border-radius:10px;}
+  .nav-item.active .badge{background:rgba(0,212,160,0.22); color:var(--accent);}
+
+  .sidebar-foot{padding:14px 18px; border-top:1px solid var(--border); font-size:11.5px; color:var(--text-faint);}
+  .conn-dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--text-faint); margin-right:6px;}
+  .conn-dot.ok{background:var(--accent);}
+  .conn-dot.bad{background:var(--danger);}
+
+  .main-col{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .topbar{
+    display:flex; align-items:center; justify-content:space-between; padding:16px 26px;
+    border-bottom:1px solid var(--border); background:var(--surface); position:sticky; top:0; z-index:20;
+  }
+  .topbar h2{font-size:16px; font-weight:700;}
+  .topbar .crumb{font-size:12px; color:var(--text-dim); margin-top:2px;}
+  .topbar-actions{display:flex; align-items:center; gap:10px;}
+
+  main{padding:22px 26px; max-width:1360px; width:100%; margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ---------- buttons / inputs ---------- */
+  .btn{
+    display:inline-flex; align-items:center; gap:6px; background:var(--accent); color:#04140F; border:none;
+    font-weight:600; font-size:13px; padding:9px 16px; border-radius:8px; transition:opacity .15s;
+  }
+  .btn:hover{opacity:.88;}
+  .btn.secondary{background:var(--surface-2); color:var(--text); border:1px solid var(--border);}
+  .btn.danger{background:var(--danger-dim); color:var(--danger); border:1px solid rgba(255,107,107,0.3);}
+  .btn.small{padding:6px 11px; font-size:12px;}
+  .btn:disabled{opacity:.5; cursor:not-allowed;}
+
+  input[type="text"], input[type="email"], input[type="tel"], input[type="number"],
+  input[type="date"], input[type="datetime-local"], input[type="url"], input[type="password"], select, textarea{
+    background:var(--bg); border:1px solid var(--border); color:var(--text);
+    padding:9px 11px; border-radius:8px; font-size:13px; font-family:inherit;
+  }
+  input:focus, select:focus, textarea:focus{outline:none; border-color:var(--accent);}
+
+  .toolbar{display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; align-items:center;}
+  .toolbar input[type="text"]{min-width:220px; flex:0 1 260px;}
+  .toolbar .spacer{flex:1;}
+  .count-pill{font-size:12px; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); padding:6px 12px; border-radius:20px;}
+
+  /* ---------- sub-tabs (within a view) ---------- */
+  .subtabs{display:flex; gap:4px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:3px; width:fit-content; margin-bottom:16px;}
+  .subtabs button{background:transparent; border:none; color:var(--text-dim); font-size:13px; font-weight:500; padding:7px 14px; border-radius:6px;}
+  .subtabs button.active{background:var(--accent-dim); color:var(--accent);}
+  .subtab-panel{display:none;}
+  .subtab-panel.active{display:block;}
+
+  /* ---------- cards ---------- */
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px;}
+  .stat-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px;}
+  .stat-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px;}
+  .stat-card .label{font-size:12px; color:var(--text-dim); margin-bottom:8px; display:flex; align-items:center; gap:7px;}
+  .stat-card .value{font-size:26px; font-weight:700;}
+  .stat-card .value.accent{color:var(--accent);}
+  .stat-card .sub{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
+
+  .home-grid{display:grid; grid-template-columns:1.1fr 1.4fr; gap:16px;}
+  @media (max-width:900px){ .home-grid{grid-template-columns:1fr;} .stat-grid{grid-template-columns:repeat(2,1fr);} }
+
+  .card h3{font-size:13.5px; font-weight:600; margin-bottom:14px;}
+  .status-bar-row{display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:12.5px;}
+  .status-bar-row .label{width:150px; color:var(--text-dim); flex-shrink:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .status-bar-track{flex:1; height:7px; background:var(--surface-2); border-radius:5px; overflow:hidden;}
+  .status-bar-fill{height:100%; border-radius:5px;}
+  .status-bar-row .n{width:26px; text-align:right; color:var(--text-faint); flex-shrink:0;}
+
+  .recent-list{display:flex; flex-direction:column; gap:2px;}
+  .recent-item{display:flex; align-items:center; justify-content:space-between; padding:10px 4px; border-bottom:1px solid var(--border); font-size:13px;}
+  .recent-item:last-child{border-bottom:none;}
+  .recent-item .name{font-weight:600;}
+  .recent-item .meta{font-size:11.5px; color:var(--text-dim);}
+
+  /* ---------- table ---------- */
+  .table-wrap{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); overflow:auto;}
+  table{width:100%; border-collapse:collapse; font-size:13px; min-width:900px;}
+  thead th{
+    text-align:left; padding:11px 14px; font-weight:600; color:var(--text-dim); font-size:11px;
+    text-transform:uppercase; letter-spacing:.04em; border-bottom:1px solid var(--border);
+    white-space:nowrap; background:var(--surface-2); position:sticky; top:0;
+  }
+  tbody td{padding:11px 14px; border-bottom:1px solid var(--border); white-space:nowrap; color:var(--text);}
+  tbody tr{transition:background .1s;}
+  tbody tr.clickable{cursor:pointer;}
+  tbody tr.clickable:hover{background:var(--surface-2);}
+  tbody tr:last-child td{border-bottom:none;}
+  .empty-row td{text-align:center; color:var(--text-faint); padding:40px; cursor:default;}
+  .empty-row:hover{background:transparent;}
+  .row-actions{display:flex; gap:6px;}
+  .icon-btn{background:var(--surface-2); border:1px solid var(--border); color:var(--text-dim); border-radius:6px; padding:5px 7px; display:inline-flex;}
+  .icon-btn:hover{color:var(--text); border-color:var(--accent);}
+  .icon-btn.danger:hover{color:var(--danger); border-color:var(--danger);}
+
+  .status-pill{display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:20px; font-size:12px; font-weight:500; white-space:nowrap;}
+  .status-pill::before{content:''; width:6px; height:6px; border-radius:50%; background:currentColor;}
+  .yn-pill{display:inline-flex; padding:3px 9px; border-radius:20px; font-size:11.5px; font-weight:600;}
+  .yn-pill.yes{background:var(--accent-dim); color:var(--accent);}
+  .yn-pill.no{background:var(--danger-dim); color:var(--danger);}
+
+  /* ---------- kanban ---------- */
+  .kanban{display:flex; gap:14px; overflow-x:auto; padding-bottom:12px; align-items:flex-start;}
+  .kanban-col{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); min-width:250px; flex-shrink:0; display:flex; flex-direction:column; max-height:calc(100vh - 300px);}
+  .kanban-col-head{padding:12px 14px; border-bottom:1px solid var(--border); border-top:3px solid; border-radius:var(--radius) var(--radius) 0 0; display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:12.5px;}
+  .kanban-col-body{padding:10px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; min-height:60px;}
+  .kanban-col-body.drag-over{background:var(--surface-2);}
+  .kcard{background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px; cursor:grab;}
+  .kcard:hover{border-color:var(--accent);}
+  .kcard.dragging{opacity:.4;}
+  .kcard .kname{font-weight:600; font-size:13px; margin-bottom:3px;}
+  .kcard .kmeta{font-size:11.5px; color:var(--text-dim); display:flex; flex-direction:column; gap:2px;}
+  .kcard .kbadge{display:inline-block; margin-top:6px; font-size:10.5px; padding:2px 7px; border-radius:12px; background:var(--accent-dim); color:var(--accent); font-weight:600;}
+
+  /* ---------- import ---------- */
+  .dropzone{
+    border:1.5px dashed var(--border); border-radius:var(--radius); padding:34px; text-align:center;
+    color:var(--text-dim); background:var(--surface); cursor:pointer; transition:border-color .15s;
+  }
+  .dropzone:hover, .dropzone.drag-over{border-color:var(--accent); color:var(--text);}
+  .dropzone svg{width:26px; height:26px; margin-bottom:10px; stroke:var(--text-faint);}
+  .mapping-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; margin:18px 0;}
+  .mapping-field label{display:block; font-size:11.5px; color:var(--text-dim); margin-bottom:5px;}
+  .mapping-field select{width:100%;}
+  .lock-badge{font-size:10.5px; opacity:.85;}
+  .field.locked label{display:flex; align-items:center; gap:5px;}
+  input[readonly]{opacity:.6; cursor:not-allowed; background:var(--surface-2);}
+  .import-summary{display:flex; gap:16px; margin:14px 0; font-size:12.5px; color:var(--text-dim);}
+  .import-summary b{color:var(--text);}
+  .progress-track{height:6px; background:var(--surface-2); border-radius:4px; overflow:hidden; margin-top:12px;}
+  .progress-fill{height:100%; background:var(--accent); width:0%; transition:width .2s;}
+
+  /* ---------- dashboards ---------- */
+  .chart-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  .chart-grid .card.full{grid-column:1/-1;}
+  .chart-canvas-box{position:relative; height:270px; width:100%;}
+  .chart-canvas-box canvas{position:absolute; inset:0; width:100% !important; height:100% !important;}
+  @media (max-width:900px){ .chart-grid{grid-template-columns:1fr;} }
+
+  /* ---------- modal ---------- */
+  .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,0.6); display:none; align-items:center; justify-content:center; z-index:100; padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface); border:1px solid var(--border); border-radius:14px; width:100%; max-width:640px; max-height:88vh; overflow-y:auto;}
+  .modal.narrow{max-width:440px;}
+  .modal-head{display:flex; align-items:center; justify-content:space-between; padding:18px 22px; border-bottom:1px solid var(--border);}
+  .modal-head h2{font-size:15px; font-weight:600;}
+  .modal-close{background:none; border:none; color:var(--text-dim); font-size:20px; line-height:1;}
+  .modal-body{padding:20px 22px;}
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px;}
+  .form-grid .full{grid-column:1/-1;}
+  .field label{display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px; font-weight:500;}
+  .field input, .field select, .field textarea{width:100%;}
+  .field textarea{resize:vertical; min-height:64px;}
+  .modal-foot{display:flex; justify-content:flex-end; gap:10px; padding:16px 22px; border-top:1px solid var(--border);}
+  .switch-row{display:flex; align-items:center; gap:10px;}
+
+  /* ---------- settings ---------- */
+  .settings-section{max-width:560px; margin-bottom:26px;}
+  .settings-section label{display:block; font-size:12.5px; color:var(--text-dim); margin-bottom:7px; font-weight:500;}
+  .settings-section input{width:100%; margin-bottom:10px;}
+  .settings-row{display:flex; gap:10px; align-items:center;}
+  .conn-status{font-size:12.5px; margin-top:10px; display:flex; align-items:center; gap:6px;}
+
+  /* ---------- toast ---------- */
+  .toast{position:fixed; bottom:22px; right:22px; background:var(--surface-2); border:1px solid var(--border); color:var(--text); padding:12px 16px; border-radius:9px; font-size:13px; z-index:200; opacity:0; transform:translateY(8px); transition:all .25s; box-shadow:0 8px 24px rgba(0,0,0,.4);}
+  .toast.show{opacity:1; transform:translateY(0);}
+  .toast.error{border-color:rgba(255,107,107,0.4); color:var(--danger);}
+
+  .banner{background:rgba(255,184,77,0.1); border:1px solid rgba(255,184,77,0.35); color:var(--warning); padding:12px 16px; border-radius:var(--radius); font-size:13px; margin-bottom:16px;}
+  .banner code{background:rgba(255,255,255,0.08); padding:1px 5px; border-radius:4px; font-size:12px;}
+
+  @media (max-width:760px){
+    .sidebar{position:fixed; left:0; top:0; z-index:50; transform:translateX(-100%); transition:transform .2s;}
+    .sidebar.open{transform:translateX(0);}
+    .form-grid{grid-template-columns:1fr;}
   }
 
-  /* ===== Main Card ===== */
-  .auth-card{
-    display:grid; grid-template-columns:1fr 1fr;
-    width:100%; max-width:880px; min-height:520px;
-    background:rgba(18, 22, 29, 0.55); border:1px solid rgba(255,255,255,0.08);
-    border-radius:16px; overflow:hidden;
-    box-shadow:0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+  /* ---------- auth screen ---------- */
+  .auth-screen{
+    position:fixed; inset:0; z-index:300; display:none; align-items:center; justify-content:center; padding:28px; overflow-y:auto;
+    background:radial-gradient(1100px 700px at 20% 15%, rgba(58,53,72,0.9) 0%, rgba(36,33,46,0.85) 55%, rgba(23,21,29,0.8) 100%),
+                radial-gradient(800px 600px at 85% 80%, rgba(0,212,160,0.06) 0%, transparent 60%);
+  }
+  .auth-screen.open{display:flex;}
+
+  .auth-shell{
+    display:flex; width:100%; max-width:920px; min-height:0; margin:auto;
+    background:rgba(18, 22, 29, 0.65); border:1px solid rgba(255,255,255,0.08); border-radius:20px; overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+    backdrop-filter:blur(20px) saturate(1.1);
+    -webkit-backdrop-filter:blur(20px) saturate(1.1);
   }
 
-  /* ===== Left Panel: Image ===== */
-  .left-panel{
-    position:relative; overflow:hidden;
-    background:linear-gradient(180deg, #3A1F6B 0%, #1A0F33 60%, #0D0818 100%);
-    display:flex; flex-direction:column; justify-content:space-between; padding:24px;
+  .auth-visual{
+    position:relative; width:360px; flex-shrink:0; display:flex; flex-direction:column; justify-content:space-between;
+    padding:22px; color:#fff; background:#1c1a24 url('rdBbW.jpg') center/cover no-repeat;
   }
-  .left-panel::before{
+  .auth-visual::after{
     content:''; position:absolute; inset:0;
-    background:url('rdBbW.jpg') center/cover no-repeat;
-    opacity:0.55; mix-blend-mode:soft-light;
+    background:linear-gradient(180deg, rgba(10,8,18,0.1) 0%, rgba(10,8,18,0.05) 38%, rgba(10,8,18,0.85) 100%);
   }
-  .left-panel::after{
-    content:''; position:absolute; inset:0;
-    background:linear-gradient(180deg, rgba(58,31,107,0.3) 0%, rgba(13,8,24,0.85) 100%);
+  .auth-visual-top, .auth-visual-bottom{position:relative; z-index:1;}
+  .auth-visual-top{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .auth-visual-brand{display:flex; align-items:center; gap:8px; font-weight:800; font-size:14px; letter-spacing:.03em;}
+  .auth-visual-brand .mark{
+    width:28px; height:28px; border-radius:8px; background:rgba(255,255,255,0.14); backdrop-filter:blur(6px);
+    border:1px solid rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-size:11.5px; font-weight:800;
   }
-  .left-top, .left-bottom{position:relative; z-index:2;}
-  .left-top{
-    display:flex; align-items:center; justify-content:space-between;
+  .auth-visual-badge{
+    font-size:11px; font-weight:500; padding:6px 12px; border-radius:20px; white-space:nowrap;
+    background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.25); backdrop-filter:blur(6px);
   }
-  .logo{
-    display:flex; align-items:center; gap:10px;
-  }
-  .logo-mark{
-    width:32px; height:32px; border-radius:8px;
-    background:var(--accent); display:flex; align-items:center; justify-content:center;
-    color:#04140F; font-weight:800; font-size:13px;
-  }
-  .logo-text{
-    font-size:15px; font-weight:700; letter-spacing:-0.3px;
-  }
-  .back-link{
-    display:inline-flex; align-items:center; gap:6px;
-    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.1);
-    color:rgba(255,255,255,0.7); font-size:12px; font-weight:500;
-    padding:7px 14px; border-radius:20px; text-decoration:none;
-    backdrop-filter:blur(8px); transition:all .2s;
-  }
-  .back-link:hover{
-    background:rgba(255,255,255,0.14); color:#fff; border-color:rgba(255,255,255,0.2);
-  }
-  .back-link svg{width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round;}
+  .auth-visual-bottom .headline{font-size:19px; font-weight:600; line-height:1.35; margin-bottom:16px;}
+  .auth-dots{display:flex; gap:6px;}
+  .auth-dots span{width:14px; height:4px; border-radius:3px; background:rgba(255,255,255,0.35);}
+  .auth-dots span.active{width:22px; background:#fff;}
 
-  .left-bottom{
-    padding-bottom:8px;
-  }
-  .left-tagline{
-    font-size:20px; font-weight:600; line-height:1.35;
-    color:#fff; text-shadow:0 2px 12px rgba(0,0,0,0.4);
-    margin-bottom:16px;
-  }
-  .carousel-dots{
-    display:flex; gap:6px;
-  }
-  .carousel-dot{
-    width:20px; height:3px; border-radius:2px;
-    background:rgba(255,255,255,0.25); transition:all .3s;
-  }
-  .carousel-dot.active{
-    width:32px; background:rgba(255,255,255,0.9);
-  }
-
-  /* ===== Right Panel: Form ===== */
-  .right-panel{
-    display:flex; flex-direction:column; justify-content:center;
-    padding:32px 40px;
-    background:rgba(18, 22, 29, 0.72);
-    backdrop-filter:blur(24px) saturate(1.2);
-    -webkit-backdrop-filter:blur(24px) saturate(1.2);
+  .auth-panel{
+    flex:1; min-width:0; padding:38px 42px; display:flex; flex-direction:column; justify-content:center; overflow-y:auto; max-height:88vh;
+    background:rgba(18, 22, 29, 0.45);
+    backdrop-filter:blur(16px) saturate(1.2);
+    -webkit-backdrop-filter:blur(16px) saturate(1.2);
     border-left:1px solid rgba(255,255,255,0.06);
     position:relative;
   }
-  .right-panel::before{
+  .auth-panel::before{
     content:''; position:absolute; inset:0;
     background:linear-gradient(135deg, rgba(123,91,245,0.04) 0%, transparent 50%, rgba(0,212,160,0.03) 100%);
-    pointer-events:none;
+    pointer-events:none; border-radius:0 20px 20px 0;
   }
-  .right-panel > *{position:relative; z-index:1;}
-  .right-header{
-    margin-bottom:20px;
-  }
-  .right-header h1{
-    font-size:20px; font-weight:700; color:var(--text);
-    margin-bottom:8px; letter-spacing:-0.3px;
-  }
-  .right-header p{
-    font-size:13.5px; color:var(--text-dim);
-  }
-  .right-header a{
-    color:var(--accent); text-decoration:none; font-weight:500;
-    transition:opacity .15s;
-  }
-  .right-header a:hover{opacity:.8;}
+  .auth-panel > *{position:relative; z-index:1;}
+  .auth-panel h2{font-size:21px; font-weight:700; margin-bottom:6px;}
+  .auth-switch{font-size:12.5px; color:var(--text-dim); margin-bottom:22px;}
+  .auth-link-btn{background:none; border:none; padding:0; margin:0; color:var(--accent); font-weight:600; font-size:inherit; font-family:inherit; cursor:pointer;}
+  .auth-link-btn:hover{text-decoration:underline;}
 
-  /* Tabs */
-  .auth-tabs{
-    display:flex; gap:4px;
-    background:var(--surface-2); border:1px solid var(--border);
-    border-radius:10px; padding:4px; margin-bottom:18px;
-    width:fit-content;
-  }
-  .auth-tabs button{
-    flex:1; background:transparent; border:none;
-    color:var(--text-dim); font-size:13px; font-weight:500;
-    padding:9px 22px; border-radius:7px; cursor:pointer;
-    font-family:inherit; transition:all .15s;
-    white-space:nowrap;
-  }
-  .auth-tabs button.active{
-    background:var(--accent-dim); color:var(--accent);
-  }
-  .auth-tabs button:not(.active):hover{
-    color:var(--text);
-  }
-
-  /* Forms */
-  .auth-form{display:flex; flex-direction:column; gap:12px;}
-  .auth-form.hidden{display:none;}
-
-  .field-group{
-    display:grid; grid-template-columns:1fr 1fr; gap:12px;
-  }
-  @media (max-width:480px){ .field-group{grid-template-columns:1fr;} }
-
-  .field label{
-    display:block; font-size:12px; color:var(--text-dim);
-    margin-bottom:6px; font-weight:500;
-  }
-  .field input, .field select{
-    width:100%; background:var(--bg); border:1px solid var(--border);
-    color:var(--text); padding:10px 12px; border-radius:9px;
-    font-size:13.5px; font-family:inherit;
-    transition:border-color .15s, box-shadow .15s;
-  }
-  .field input::placeholder{color:var(--text-faint);}
-  .field input:focus, .field select:focus{
-    outline:none; border-color:var(--accent);
-    box-shadow:0 0 0 3px rgba(0,212,160,0.08);
-  }
-
-  .field.password-wrap{position:relative;}
-  .toggle-pw{
-    position:absolute; right:12px; top:50%; transform:translateY(-50%);
-    background:none; border:none; color:var(--text-faint);
-    cursor:pointer; padding:4px; display:flex; align-items:center; justify-content:center;
-    transition:color .15s;
-  }
-  .toggle-pw:hover{color:var(--text-dim);}
-  .toggle-pw svg{width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round;}
-
-  .checkbox-row{
-    display:flex; align-items:center; gap:9px;
-    font-size:12px; color:var(--text-dim);
-  }
-  .checkbox-row input[type="checkbox"]{
-    width:16px; height:16px; accent-color:var(--accent);
-    cursor:pointer;
-  }
-  .checkbox-row a{
-    color:var(--accent); text-decoration:none; font-weight:500;
-  }
-  .checkbox-row a:hover{text-decoration:underline;}
-
-  .btn{
-    display:inline-flex; align-items:center; justify-content:center; gap:7px;
-    background:var(--accent); color:#04140F; border:none;
-    font-weight:600; font-size:14px; padding:11px 16px;
-    border-radius:9px; cursor:pointer; font-family:inherit;
-    transition:all .15s; width:100%; margin-top:4px;
-  }
-  .btn:hover{opacity:.9; transform:translateY(-1px);}
-  .btn:active{transform:translateY(0);}
-  .btn:disabled{opacity:.5; cursor:not-allowed; transform:none;}
-
-  .divider{
-    display:flex; align-items:center; gap:12px;
-    color:var(--text-faint); font-size:12px;
-    margin:4px 0;
-  }
-  .divider::before, .divider::after{
-    content:''; flex:1; height:1px; background:var(--border);
-  }
-
-  .social-row{
-    display:grid; grid-template-columns:1fr 1fr; gap:12px;
-  }
-  .social-btn{
-    display:flex; align-items:center; justify-content:center; gap:8px;
-    background:var(--surface-2); border:1px solid var(--border);
-    color:var(--text); font-size:13px; font-weight:500;
-    padding:9px; border-radius:9px; cursor:pointer;
-    font-family:inherit; transition:all .15s;
-  }
-  .social-btn:hover{
-    background:var(--surface-3); border-color:var(--text-faint);
-  }
-  .social-btn svg{width:16px; height:16px; flex-shrink:0;}
-
-  .auth-error{
-    font-size:12px; color:var(--danger);
-    background:var(--danger-dim); border:1px solid rgba(255,107,107,0.3);
-    padding:10px 13px; border-radius:8px; display:none; margin-bottom:4px;
-  }
+  .auth-form{display:flex; flex-direction:column; gap:13px;}
+  .auth-form .field input, .auth-form .field select{width:100%;}
+  .auth-error{font-size:12.5px; color:var(--danger); background:var(--danger-dim); border:1px solid rgba(255,107,107,0.3); padding:9px 11px; border-radius:8px; display:none; margin-bottom:14px;}
   .auth-error.show{display:block;}
+  .auth-form .btn{width:100%; justify-content:center; margin-top:4px;}
+  .auth-name-row{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
 
-  .auth-hint{
-    font-size:11.5px; color:var(--text-faint); line-height:1.5;
-  }
+  .pw-wrap{position:relative;}
+  .pw-wrap input{width:100%; padding-right:38px;}
+  .pw-eye{position:absolute; right:6px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-faint); padding:6px; display:flex; align-items:center; justify-content:center;}
+  .pw-eye:hover{color:var(--text);}
+  .pw-eye svg{width:16px; height:16px;}
+  .pw-eye .eye-off{display:none;}
+  .pw-eye.showing .eye-on{display:none;}
+  .pw-eye.showing .eye-off{display:block;}
 
-  .conn-toggle{
-    font-size:11.5px; color:var(--text-faint); background:none; border:none;
-    margin-top:18px; text-decoration:underline; text-underline-offset:2px;
-    cursor:pointer; font-family:inherit; transition:color .15s;
-  }
-  .conn-toggle:hover{color:var(--text-dim);}
+  .auth-conn-toggle{font-size:11.5px; color:var(--text-faint); background:none; border:none; margin-top:18px; text-decoration:underline; text-underline-offset:2px;}
+  .auth-conn-panel{display:none; margin-top:12px; padding-top:14px; border-top:1px solid var(--border);}
+  .auth-conn-panel.open{display:block;}
+  .auth-conn-panel label{display:block; font-size:11.5px; color:var(--text-dim); margin-bottom:6px;}
+  .auth-conn-panel input{width:100%; margin-bottom:8px;}
+  .auth-hint{font-size:11.5px; color:var(--text-faint); margin-top:4px;}
 
-  .conn-panel{
-    display:none; margin-top:14px; padding-top:14px;
-    border-top:1px solid var(--border);
-  }
-  .conn-panel.open{display:block;}
-  .conn-panel label{
-    display:block; font-size:11.5px; color:var(--text-dim); margin-bottom:6px;
-  }
-  .conn-panel input{
-    width:100%; background:var(--bg); border:1px solid var(--border);
-    color:var(--text); padding:9px 11px; border-radius:8px;
-    font-size:13px; font-family:inherit; margin-bottom:8px;
-  }
-  .conn-panel input:focus{outline:none; border-color:var(--accent);}
-  .conn-panel .btn{width:auto; padding:8px 14px; font-size:12px; margin-top:0;}
-
-  /* ===== Responsive ===== */
-  @media (max-width:860px){
-    .auth-card{grid-template-columns:1fr; max-width:400px;}
-    .left-panel{min-height:180px; padding:22px;}
-    .left-tagline{font-size:18px;}
-    .right-panel{padding:32px 28px;}
-  }
-  @media (max-width:380px){
-    .right-panel{padding:24px 20px;}
-    .auth-tabs button{padding:8px 14px; font-size:12px;}
+  @media (max-width:760px){
+    .auth-visual{display:none;}
+    .auth-shell{border-radius:16px;}
+    .auth-panel{padding:30px 22px;}
   }
 </style>
 <base target="_blank">
 </head>
 <body>
 
-<div class="auth-card">
-  <!-- Left Panel -->
-  <div class="left-panel">
-    <div class="left-top">
-      <div class="logo">
-        <div class="logo-mark">CP</div>
-        <span class="logo-text">CredPal</span>
+<!-- ===== AUTH SCREEN ===== -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-shell">
+
+    <div class="auth-visual">
+      <div class="auth-visual-top">
+        <div class="auth-visual-brand"><span class="mark">CP</span> Telesales CRM</div>
+        <div class="auth-visual-badge">CredPal Platform</div>
       </div>
-      <a href="#" class="back-link">
-        <svg viewBox="0 0 24 24"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
-        Back to website
-      </a>
-    </div>
-    <div class="left-bottom">
-      <div class="left-tagline">
-        Capturing Moments,<br>Creating Memories
-      </div>
-      <div class="carousel-dots">
-        <div class="carousel-dot"></div>
-        <div class="carousel-dot"></div>
-        <div class="carousel-dot active"></div>
+      <div class="auth-visual-bottom">
+        <div class="headline">Track every lead,<br>close every deal.</div>
+        <div class="auth-dots"><span></span><span></span><span class="active"></span></div>
       </div>
     </div>
+
+    <div class="auth-panel">
+      <div class="auth-panel-inner">
+        <h2 id="authHeading">Log in</h2>
+        <p class="auth-switch" id="authSwitchLogin">Don't have an account? <button type="button" class="auth-link-btn" id="authTabSignup">Sign up</button></p>
+        <p class="auth-switch" id="authSwitchSignup" style="display:none;">Already have an account? <button type="button" class="auth-link-btn" id="authTabLogin">Log in</button></p>
+
+        <div class="auth-error" id="authError"></div>
+
+        <form class="auth-form" id="authLoginForm" onsubmit="return false;">
+          <div class="field"><label>Email</label><input type="email" id="authLoginEmail" autocomplete="username" required /></div>
+          <div class="field">
+            <label>Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="authLoginPassword" autocomplete="current-password" required />
+              <button type="button" class="pw-eye" data-target="authLoginPassword" aria-label="Show password"><svg class="icon eye-on" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a20.6 20.6 0 0 1-2.63 3.68"/><path d="M1 1l22 22"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/></svg></button>
+            </div>
+          </div>
+          <button class="btn" id="authLoginBtn" type="button">Sign in</button>
+        </form>
+
+        <form class="auth-form" id="authSignupForm" style="display:none;" onsubmit="return false;">
+          <div class="field"><label>Full name</label><input type="text" id="authSignupName" autocomplete="name" required /></div>
+          <div class="field"><label>Work email</label><input type="email" id="authSignupEmail" autocomplete="username" required /></div>
+          <div class="field">
+            <label>Account type</label>
+            <select id="authSignupRole">
+              <option value="Agent" selected>Agent</option>
+              <option value="Admin">Admin</option>
+            </select>
+          </div>
+          <div class="field" id="authAdminCodeField" style="display:none;">
+            <label>Admin invite code</label>
+            <input type="password" id="authAdminCode" autocomplete="off" />
+            <div class="auth-hint">Ask your CRM administrator for this code.</div>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <div class="pw-wrap">
+              <input type="password" id="authSignupPassword" autocomplete="new-password" required />
+              <button type="button" class="pw-eye" data-target="authSignupPassword" aria-label="Show password"><svg class="icon eye-on" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a20.6 20.6 0 0 1-2.63 3.68"/><path d="M1 1l22 22"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/></svg></button>
+            </div>
+          </div>
+          <div class="field">
+            <label>Confirm password</label>
+            <div class="pw-wrap">
+              <input type="password" id="authSignupConfirm" autocomplete="new-password" required />
+              <button type="button" class="pw-eye" data-target="authSignupConfirm" aria-label="Show password"><svg class="icon eye-on" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg><svg class="icon eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a20.6 20.6 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 7 11 7a20.6 20.6 0 0 1-2.63 3.68"/><path d="M1 1l22 22"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/></svg></button>
+            </div>
+          </div>
+          <div class="auth-hint">Use at least 6 characters. This becomes your login for the CRM, and your email will appear automatically in the Agent list.</div>
+          <button class="btn" id="authSignupBtn" type="button">Create account</button>
+        </form>
+
+        <button class="auth-conn-toggle" id="authConnToggle" type="button">⚙ Configure Google Sheet connection</button>
+        <div class="auth-conn-panel" id="authConnPanel">
+          <label>Apps Script Web App URL</label>
+          <input type="url" id="authConnUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" />
+          <button class="btn secondary small" id="authConnSaveBtn" type="button">Save connection</button>
+        </div>
+      </div>
+    </div>
+
   </div>
+</div>
 
-  <!-- Right Panel -->
-  <div class="right-panel">
-    <div class="right-header">
-      <h1 id="authTitle">Create an account</h1>
-      <p>Already have an account? <a href="#" id="switchLink">Log in</a></p>
-    </div>
-
-    <div class="auth-tabs">
-      <button id="tabLogin" type="button">Log in</button>
-      <button id="tabSignup" class="active" type="button">Sign up</button>
-    </div>
-
-    <div class="auth-error" id="authError"></div>
-
-    <!-- Sign Up Form -->
-    <form class="auth-form" id="signupForm" onsubmit="return false;">
-      <div class="field-group">
-        <div class="field">
-          <label>First name</label>
-          <input type="text" id="signupFirstName" placeholder="Fletcher" required />
-        </div>
-        <div class="field">
-          <label>Last name</label>
-          <input type="text" id="signupLastName" placeholder="Doe" />
-        </div>
+<div class="app-shell" id="appShell" style="display:none;">
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <div class="mark">CP</div>
+      <div>
+        <h1>Telesales CRM</h1>
+        <div class="sub">CredPal Platform</div>
       </div>
-      <div class="field">
-        <label>Email</label>
-        <input type="email" id="signupEmail" placeholder="you@company.com" autocomplete="username" required />
-      </div>
-      <div class="field password-wrap">
-        <label>Password</label>
-        <input type="password" id="signupPassword" placeholder="Enter your password" autocomplete="new-password" required />
-        <button type="button" class="toggle-pw" data-target="signupPassword">
-          <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-label">Overview</div>
+      <button class="nav-item active" data-view="home">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
+        Home
+      </button>
+      <button class="nav-item" data-view="leads">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        Leads
+        <span class="badge" id="navLeadsCount">0</span>
+      </button>
+      <button class="nav-item" data-view="dashboards">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
+        Dashboards
+      </button>
+      <div class="nav-label">Manage</div>
+      <button class="nav-item" data-view="agents">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.6-3.4 3.2-5.5 6.5-5.5s5.9 2.1 6.5 5.5"/><circle cx="18" cy="8.5" r="2.4"/><path d="M16.5 14.6c2.4.4 4.1 2.1 4.6 5"/></svg>
+        Agents
+        <span class="badge" id="navAgentsCount">0</span>
+      </button>
+      <button class="nav-item" data-view="roles">
+        <svg class="icon" viewBox="0 0 24 24"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/></svg>
+        Team Roles
+      </button>
+      <div class="nav-label">System</div>
+      <button class="nav-item" data-view="settings">
+        <svg class="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9c.2.6.7 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        Settings
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      <div id="sidebarUserInfo" style="margin-bottom:10px;"></div>
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <span><span class="conn-dot" id="connDot"></span><span id="connLabel">Not connected</span></span>
+        <button class="icon-btn" id="logoutBtn" title="Log out">
+          <svg class="icon" viewBox="0 0 24 24" style="width:14px;height:14px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
         </button>
       </div>
-      <div class="checkbox-row">
-        <input type="checkbox" id="signupTerms" checked />
-        <label for="signupTerms" style="margin:0; cursor:pointer;">I agree to the <a href="#">Terms &amp; Conditions</a></label>
-      </div>
-      <button class="btn" id="signupBtn" type="button">Create account</button>
-    </form>
-
-    <!-- Log In Form -->
-    <form class="auth-form hidden" id="loginForm" onsubmit="return false;">
-      <div class="field">
-        <label>Email</label>
-        <input type="email" id="loginEmail" placeholder="you@company.com" autocomplete="username" required />
-      </div>
-      <div class="field password-wrap">
-        <label>Password</label>
-        <input type="password" id="loginPassword" placeholder="Enter your password" autocomplete="current-password" required />
-        <button type="button" class="toggle-pw" data-target="loginPassword">
-          <svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-        </button>
-      </div>
-      <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px;">
-        <div class="checkbox-row" style="margin:0;">
-          <input type="checkbox" id="loginRemember" />
-          <label for="loginRemember" style="margin:0; cursor:pointer;">Remember me</label>
-        </div>
-        <a href="#" style="color:var(--accent); text-decoration:none; font-weight:500; font-size:12px;">Forgot password?</a>
-      </div>
-      <button class="btn" id="loginBtn" type="button">Sign in</button>
-    </form>
-
-    <div class="divider">Or register with</div>
-
-    <div class="social-row">
-      <button class="social-btn" type="button">
-        <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Google
-      </button>
-      <button class="social-btn" type="button">
-        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09l.01-.01zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/></svg>
-        Apple
-      </button>
     </div>
+  </aside>
 
-    <button class="conn-toggle" id="connToggle" type="button">⚙ Configure Google Sheet connection</button>
-    <div class="conn-panel" id="connPanel">
-      <label>Apps Script Web App URL</label>
-      <input type="url" id="connUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" />
-      <button class="btn secondary" id="connSaveBtn" type="button" style="width:auto; padding:8px 14px; font-size:12px; margin-top:0;">Save connection</button>
+  <div class="main-col">
+    <header class="topbar">
+      <div>
+        <h2 id="topbarTitle">Home</h2>
+        <div class="crumb" id="topbarCrumb">Overview of credit card leads</div>
+      </div>
+      <div class="topbar-actions">
+        <button class="btn secondary small" id="refreshBtn">↻ Refresh</button>
+        <button class="btn" id="newLeadBtn">+ New Lead</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="banner" id="configBanner" style="display:none;">
+        No Web App URL configured yet. Go to <strong>Settings</strong> and paste your deployed Apps Script Web App URL to connect this platform to your Google Sheet.
+      </div>
+
+      <!-- ===== HOME ===== -->
+      <section class="view active" id="view-home">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="label">Total leads</div>
+            <div class="value" id="statTotal">0</div>
+            <div class="sub">Across all agents</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Converted</div>
+            <div class="value accent" id="statConverted">0</div>
+            <div class="sub" id="statConvertedRate">0% conversion</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Follow-ups due (7 days)</div>
+            <div class="value" id="statFollowups">0</div>
+            <div class="sub">Needs agent action</div>
+          </div>
+          <div class="stat-card">
+            <div class="label">Active agents</div>
+            <div class="value" id="statAgents">0</div>
+            <div class="sub" id="statAgentsSub">of 0 total</div>
+          </div>
+        </div>
+
+        <div class="home-grid">
+          <div class="card">
+            <h3>Leads by call status</h3>
+            <div id="statusBreakdown"></div>
+          </div>
+          <div class="card">
+            <h3>Recently added leads</h3>
+            <div class="recent-list" id="recentLeads"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== LEADS ===== -->
+      <section class="view" id="view-leads">
+        <div class="subtabs">
+          <button class="subtab-btn active" data-sub="table">Table</button>
+          <button class="subtab-btn" data-sub="kanban">Kanban</button>
+          <button class="subtab-btn" data-sub="import">Import CSV</button>
+        </div>
+
+        <div class="subtab-panel active" id="sub-table">
+          <div class="toolbar">
+            <input type="text" id="searchInput" placeholder="Search name, phone, email, or User ID…" />
+            <select id="filterAgent"><option value="">All agents</option></select>
+            <select id="filterAssignment"><option value="">All assignments</option></select>
+            <select id="filterStatus"><option value="">All statuses</option></select>
+            <div class="spacer"></div>
+            <span class="count-pill" id="countPill">0 leads</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Customer</th><th>Phone</th><th>Agent</th><th>Assignment</th>
+                  <th>Call Status</th><th>Status Updated</th><th>Follow-up / Close</th><th>Credit Limit</th><th>Contact Date</th><th>Created</th>
+                </tr>
+              </thead>
+              <tbody id="tableBody"><tr class="empty-row"><td colspan="10">Loading leads…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="subtab-panel" id="sub-kanban">
+          <div class="kanban" id="kanbanBoard"></div>
+        </div>
+
+        <div class="subtab-panel" id="sub-import">
+          <div class="card" style="max-width:820px;">
+            <h3>Import leads from CSV</h3>
+            <div class="dropzone" id="dropzone">
+              <svg viewBox="0 0 24 24" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" fill="none"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+              <div><strong>Click to choose a CSV file</strong>, or drag one here</div>
+              <div style="font-size:11.5px; margin-top:4px;">Headers don't need to match exactly — you can map columns below.</div>
+              <div style="font-size:11.5px; margin-top:2px;">If your CSV doesn't include an "Agents" (owner email) column, rows are assigned to whoever you pick below.</div>
+              <input type="file" id="csvInput" accept=".csv" style="display:none;" />
+            </div>
+
+            <div id="importMappingBlock" style="display:none;">
+              <div class="import-summary">
+                <span><b id="csvRowCount">0</b> rows detected</span>
+                <span><b id="csvFileName">—</b></span>
+              </div>
+              <div class="field" style="max-width:340px; margin-bottom:14px;">
+                <label>Assign unmapped rows to</label>
+                <select id="importDefaultAgent"></select>
+              </div>
+              <div class="mapping-grid" id="mappingGrid"></div>
+
+              <div class="table-wrap" style="margin-bottom:14px;">
+                <table id="previewTable"><thead></thead><tbody></tbody></table>
+              </div>
+
+              <div class="progress-track" id="importProgressTrack" style="display:none;">
+                <div class="progress-fill" id="importProgressFill"></div>
+              </div>
+
+              <div style="display:flex; gap:10px; margin-top:14px;">
+                <button class="btn" id="confirmImportBtn">Import leads</button>
+                <button class="btn secondary" id="cancelImportBtn">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===== DASHBOARDS ===== -->
+      <section class="view" id="view-dashboards">
+        <div class="chart-grid">
+          <div class="card chart-card"><h3>Leads by call status</h3><div class="chart-canvas-box"><canvas id="chartStatus"></canvas></div></div>
+          <div class="card chart-card"><h3>Leads by assignment</h3><div class="chart-canvas-box"><canvas id="chartAssignment"></canvas></div></div>
+          <div class="card chart-card"><h3>Leads by agent</h3><div class="chart-canvas-box"><canvas id="chartAgent"></canvas></div></div>
+          <div class="card chart-card full"><h3>Leads created — last 14 days</h3><div class="chart-canvas-box"><canvas id="chartTrend"></canvas></div></div>
+        </div>
+      </section>
+
+      <!-- ===== AGENTS ===== -->
+      <section class="view" id="view-agents">
+        <div class="toolbar">
+          <div class="spacer"></div>
+          <span class="count-pill" id="agentsCountPill">0 agents</span>
+          <button class="btn" id="newAgentBtn">+ New Agent</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Active</th><th></th></tr></thead>
+            <tbody id="agentsTableBody"><tr class="empty-row"><td colspan="5">Loading agents…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== TEAM ROLES ===== -->
+      <section class="view" id="view-roles">
+        <div class="toolbar">
+          <div class="spacer"></div>
+          <span class="count-pill" id="rolesCountPill">0 roles</span>
+          <button class="btn" id="newRoleBtn">+ New Role</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Role name</th><th>Description</th><th></th></tr></thead>
+            <tbody id="rolesTableBody"><tr class="empty-row"><td colspan="3">Loading roles…</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ===== SETTINGS ===== -->
+      <section class="view" id="view-settings">
+        <div class="settings-section card">
+          <label>Apps Script Web App URL</label>
+          <input type="url" id="webAppUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec" />
+          <div class="settings-row">
+            <button class="btn" id="saveUrlBtn">Save &amp; connect</button>
+            <button class="btn secondary" id="testConnBtn">Test connection</button>
+          </div>
+          <div class="conn-status" id="settingsConnStatus"></div>
+        </div>
+        <div class="settings-section card">
+          <h3 style="margin-bottom:10px;">About this platform</h3>
+          <div style="color:var(--text-dim); font-size:12.5px; line-height:1.7;">
+            This CRM reads and writes directly to your Google Sheet through the Apps Script Web App.
+            Leads, Agents, and Team Roles each live on their own tab in that sheet — no separate database.
+            Your Web App URL is stored only in this browser's local storage, never sent anywhere else.
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<!-- Lead modal -->
+<div class="modal-overlay" id="leadModalOverlay">
+  <div class="modal">
+    <div class="modal-head"><h2 id="leadModalTitle">New Lead</h2><button class="modal-close" data-close="leadModalOverlay">&times;</button></div>
+    <div class="modal-body">
+      <form id="leadForm">
+        <div class="form-grid">
+          <div class="field">
+            <label>Assignment</label>
+            <select name="ASSIGNMENTS" required>
+              <option value="">Select assignment</option>
+              <option>Retention MOM</option><option>Net User Utilization</option>
+              <option>Not Tokenization</option><option>User Activation</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Agent</label>
+            <select name="Agents" id="leadAgentSelect" required><option value="">Select agent</option></select>
+          </div>
+          <div class="field"><label>User ID</label><input type="text" name="User_ID" /></div>
+          <div class="field"><label>Customer Name</label><input type="text" name="Customer Name" required /></div>
+          <div class="field"><label>Phone Number</label><input type="tel" name="Phone Number" /></div>
+          <div class="field"><label>Email</label><input type="email" name="Email" /></div>
+          <div class="field"><label>Salary</label><input type="number" name="Salary" step="0.01" /></div>
+          <div class="field"><label>Credit Limit</label><input type="number" name="Credit Limit" step="0.01" /></div>
+          <div class="field"><label>Selfie Verified At</label><input type="datetime-local" name="Selfie Verified At" /></div>
+          <div class="field"><label>Contact Date</label><input type="date" name="CONTACT DATE" /></div>
+          <div class="field">
+            <label>Call Status</label>
+            <select name="CALL STATUS" id="leadCallStatusSelect">
+              <option value="">Not Contacted</option>
+              <option>Answered - Interested</option><option>Answered - Not Interested</option>
+              <option>No Answer</option><option>Switched Off / Unreachable</option>
+              <option>Wrong Number</option><option>Call Back Later</option><option>Converted</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Status Updated At</label>
+            <input type="datetime-local" name="Status Updated At" id="leadStatusUpdatedInput" />
+          </div>
+          <div class="field locked">
+            <label>Created At <span class="lock-badge" title="Set on creation or CSV import — not editable afterward">🔒</span></label>
+            <input type="datetime-local" name="Created_at" id="leadCreatedAtInput" readonly />
+          </div>
+          <div class="field"><label>Follow-up / Close Date</label><input type="date" name="FOLLOW - UP DATE / CLOSE DATE" /></div>
+          <div class="field full"><label>Feedback</label><textarea name="FEED BACK"></textarea></div>
+          <div class="field full"><label>Note</label><textarea name="NOTE"></textarea></div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" data-close="leadModalOverlay">Cancel</button>
+      <button class="btn" id="saveLeadBtn">Save Lead</button>
     </div>
   </div>
 </div>
 
+<!-- Agent modal -->
+<div class="modal-overlay" id="agentModalOverlay">
+  <div class="modal narrow">
+    <div class="modal-head"><h2 id="agentModalTitle">New Agent</h2><button class="modal-close" data-close="agentModalOverlay">&times;</button></div>
+    <div class="modal-body">
+      <form id="agentForm">
+        <div class="field" style="margin-bottom:14px;"><label>Name</label><input type="text" name="Name" required /></div>
+        <div class="field" style="margin-bottom:14px;"><label>Email</label><input type="email" name="Email" required /></div>
+        <div class="field" style="margin-bottom:14px;">
+          <label>Role</label>
+          <select name="Role" id="agentRoleSelect"></select>
+        </div>
+        <div class="field" style="margin-bottom:14px;">
+          <label id="agentPasswordLabel">Password</label>
+          <input type="password" name="Password" id="agentPasswordInput" autocomplete="new-password" />
+        </div>
+        <div class="field">
+          <label>Active</label>
+          <select name="Active"><option>Yes</option><option>No</option></select>
+        </div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" data-close="agentModalOverlay">Cancel</button>
+      <button class="btn" id="saveAgentBtn">Save Agent</button>
+    </div>
+  </div>
+</div>
+
+<!-- Role modal -->
+<div class="modal-overlay" id="roleModalOverlay">
+  <div class="modal narrow">
+    <div class="modal-head"><h2 id="roleModalTitle">New Role</h2><button class="modal-close" data-close="roleModalOverlay">&times;</button></div>
+    <div class="modal-body">
+      <form id="roleForm">
+        <div class="field" style="margin-bottom:14px;"><label>Role name</label><input type="text" name="Role Name" required /></div>
+        <div class="field"><label>Description</label><textarea name="Description"></textarea></div>
+      </form>
+    </div>
+    <div class="modal-foot">
+      <button class="btn secondary" data-close="roleModalOverlay">Cancel</button>
+      <button class="btn" id="saveRoleBtn">Save Role</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
 <script>
-/* ===== Tab Switching ===== */
-const tabLogin = document.getElementById('tabLogin');
-const tabSignup = document.getElementById('tabSignup');
-const loginForm = document.getElementById('loginForm');
-const signupForm = document.getElementById('signupForm');
-const authTitle = document.getElementById('authTitle');
-const switchLink = document.getElementById('switchLink');
+/* ============ CONFIG ============ */
+const CONFIG = { webAppUrl: localStorage.getItem('crmWebAppUrl') || '' };
 
-function showLogin(){
-  tabLogin.classList.add('active');
-  tabSignup.classList.remove('active');
-  loginForm.classList.remove('hidden');
-  signupForm.classList.add('hidden');
-  authTitle.textContent = 'Welcome back';
-  switchLink.textContent = 'Sign up';
-  switchLink.onclick = (e) => { e.preventDefault(); showSignup(); };
-  hideError();
-}
-function showSignup(){
-  tabSignup.classList.add('active');
-  tabLogin.classList.remove('active');
-  signupForm.classList.remove('hidden');
-  loginForm.classList.add('hidden');
-  authTitle.textContent = 'Create an account';
-  switchLink.textContent = 'Log in';
-  switchLink.onclick = (e) => { e.preventDefault(); showLogin(); };
-  hideError();
-}
+const LEAD_HEADERS = [
+  'ASSIGNMENTS','Agents','User_ID','Customer Name','Phone Number','Email','Salary','Credit Limit',
+  'Selfie Verified At','Created_at','CONTACT DATE','CALL STATUS','Status Updated At','FEED BACK','NOTE','FOLLOW - UP DATE / CLOSE DATE'
+];
+const IMPORTABLE_HEADERS = LEAD_HEADERS.slice();
 
-tabLogin.addEventListener('click', showLogin);
-tabSignup.addEventListener('click', showSignup);
-switchLink.addEventListener('click', (e) => {
-  e.preventDefault();
-  if (signupForm.classList.contains('hidden')) showSignup(); else showLogin();
+const CALL_STATUSES = ['Not Contacted','Answered - Interested','Answered - Not Interested','No Answer','Switched Off / Unreachable','Wrong Number','Call Back Later','Converted'];
+const STATUS_COLORS = {
+  'Not Contacted':'#8B96A5','Answered - Interested':'#00D4A0','Answered - Not Interested':'#FF6B6B',
+  'No Answer':'#FFB84D','Switched Off / Unreachable':'#5A6472','Wrong Number':'#E85D75',
+  'Call Back Later':'#5B9DFF','Converted':'#12E8B0'
+};
+const ASSIGNMENTS = ['Retention MOM','Net User Utilization','Not Tokenization','User Activation'];
+
+const INACTIVITY_LIMIT_MS = 10 * 60 * 1000; // 10 minutes
+
+/* ============ STATE ============ */
+let leads = [], agents = [], roles = [];
+let currentView = 'home', currentLeadSub = 'table';
+let editingLeadRow = null, editingAgentRow = null, editingRoleRow = null;
+let editingLeadOriginalStatus = null;
+let csvRows = [], csvHeaders = [], columnMapping = {};
+let charts = {};
+let inactivityTimer = null;
+let session = null;
+try{ session = JSON.parse(localStorage.getItem('crmSession') || 'null'); }catch(e){ session = null; }
+
+/* ============ INIT ============ */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('webAppUrlInput').value = CONFIG.webAppUrl;
+  document.getElementById('authConnUrlInput').value = CONFIG.webAppUrl;
+  updateConnBadge(null);
+  if (!CONFIG.webAppUrl) document.getElementById('configBanner').style.display = 'block';
+
+  bindNav();
+  bindLeadEvents();
+  bindAgentEvents();
+  bindRoleEvents();
+  bindSettingsEvents();
+  bindImportEvents();
+  bindAuthEvents();
+  bindSessionGuards();
+
+  if (session && session.Email){
+    hideAuthScreen();
+    updateSidebarUser();
+    loadAll();
+    resetInactivityTimer();
+  } else {
+    showAuthScreen();
+  }
 });
 
-/* ===== Password Toggle ===== */
-document.querySelectorAll('.toggle-pw').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const input = document.getElementById(btn.dataset.target);
-    const isHidden = input.type === 'password';
-    input.type = isHidden ? 'text' : 'password';
-    btn.innerHTML = isHidden
-      ? '<svg viewBox="0 0 24 24"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>'
-      : '<svg viewBox="0 0 24 24"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+async function loadAll(){
+  await Promise.all([loadLeads(), loadAgents(), loadRoles()]);
+  populateDropdowns();
+  renderCurrentView();
+}
+
+/* ============ SESSION GUARDS: close-window + inactivity logout ============ */
+function bindSessionGuards(){
+  // Log out when the tab/window is closed (also fires on refresh/navigation,
+  // which is an accepted tradeoff of relying on beforeunload).
+  window.addEventListener('beforeunload', () => {
+    if (session) localStorage.removeItem('crmSession');
   });
-});
 
-/* ===== Connection Panel ===== */
-document.getElementById('connToggle').addEventListener('click', () => {
-  document.getElementById('connPanel').classList.toggle('open');
-});
-document.getElementById('connSaveBtn').addEventListener('click', () => {
-  const url = document.getElementById('connUrlInput').value.trim();
-  localStorage.setItem('crmWebAppUrl', url);
-  showToast('Connection saved');
-});
+  ['mousemove','mousedown','keydown','scroll','touchstart','click'].forEach(evt => {
+    document.addEventListener(evt, resetInactivityTimer, { passive: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') resetInactivityTimer();
+  });
+}
 
-/* ===== Error Handling ===== */
-function showError(msg){
+function resetInactivityTimer(){
+  if (!session) return;
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(() => {
+    if (!session) return;
+    logout();
+    showAuthError('You were logged out after 10 minutes of inactivity.');
+  }, INACTIVITY_LIMIT_MS);
+}
+function stopInactivityTimer(){ clearTimeout(inactivityTimer); inactivityTimer = null; }
+
+/* ============ AUTH ============ */
+function bindAuthEvents(){
+  document.getElementById('authTabLogin').addEventListener('click', () => switchAuthTab('login'));
+  document.getElementById('authTabSignup').addEventListener('click', () => switchAuthTab('signup'));
+  document.getElementById('authSignupRole').addEventListener('change', toggleAdminCodeField);
+  document.querySelectorAll('.pw-eye').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const input = document.getElementById(btn.dataset.target);
+      if (!input) return;
+      const showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      btn.classList.toggle('showing', !showing);
+    });
+  });
+  document.getElementById('authLoginBtn').addEventListener('click', handleLogin);
+  document.getElementById('authSignupBtn').addEventListener('click', handleSignup);
+  document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('authConnToggle').addEventListener('click', () => {
+    document.getElementById('authConnPanel').classList.toggle('open');
+  });
+  document.getElementById('authConnSaveBtn').addEventListener('click', async () => {
+    const url = document.getElementById('authConnUrlInput').value.trim();
+    CONFIG.webAppUrl = url;
+    localStorage.setItem('crmWebAppUrl', url);
+    document.getElementById('webAppUrlInput').value = url;
+    document.getElementById('configBanner').style.display = url ? 'none' : 'block';
+    showToast('Connection saved');
+    await loadRoles();
+  });
+  // Enter key submits the active auth form
+  document.getElementById('authScreen').addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    const loginVisible = document.getElementById('authLoginForm').style.display !== 'none';
+    if (loginVisible) handleLogin(); else handleSignup();
+  });
+}
+
+function switchAuthTab(tab){
+  document.getElementById('authHeading').textContent = tab === 'login' ? 'Log in' : 'Create an account';
+  document.getElementById('authSwitchLogin').style.display = tab === 'login' ? 'block' : 'none';
+  document.getElementById('authSwitchSignup').style.display = tab === 'signup' ? 'block' : 'none';
+  document.getElementById('authLoginForm').style.display = tab === 'login' ? 'flex' : 'none';
+  document.getElementById('authSignupForm').style.display = tab === 'signup' ? 'flex' : 'none';
+  hideAuthError();
+}
+
+function showAuthScreen(){
+  document.getElementById('authScreen').classList.add('open');
+  document.getElementById('appShell').style.display = 'none';
+}
+function hideAuthScreen(){
+  document.getElementById('authScreen').classList.remove('open');
+  document.getElementById('appShell').style.display = 'flex';
+}
+function showAuthError(msg){
   const el = document.getElementById('authError');
   el.textContent = msg; el.classList.add('show');
 }
-function hideError(){ document.getElementById('authError').classList.remove('show'); }
+function hideAuthError(){ document.getElementById('authError').classList.remove('show'); }
 
-/* ===== Auth Actions ===== */
-document.getElementById('loginBtn').addEventListener('click', async () => {
-  hideError();
-  const email = document.getElementById('loginEmail').value.trim();
-  const password = document.getElementById('loginPassword').value;
-  if (!email || !password){ showError('Enter your email and password.'); return; }
-  const btn = document.getElementById('loginBtn');
-  btn.disabled = true; btn.textContent = 'Signing in…';
-  try{
-    // Replace with your actual API call
-    await new Promise(r => setTimeout(r, 800));
-    showToast('Welcome back!');
-    // window.location.href = 'dashboard.html';
-  }catch(err){ showError(err.message || 'Could not sign in'); }
-  finally{ btn.disabled = false; btn.textContent = 'Sign in'; }
-});
-
-document.getElementById('signupBtn').addEventListener('click', async () => {
-  hideError();
-  const first = document.getElementById('signupFirstName').value.trim();
-  const last = document.getElementById('signupLastName').value.trim();
-  const email = document.getElementById('signupEmail').value.trim();
-  const password = document.getElementById('signupPassword').value;
-  if (!first || !email || !password){ showError('Fill in your name, email, and password.'); return; }
-  if (password.length < 6){ showError('Password must be at least 6 characters.'); return; }
-  if (!document.getElementById('signupTerms').checked){ showError('Please agree to the Terms & Conditions.'); return; }
-  const btn = document.getElementById('signupBtn');
-  btn.disabled = true; btn.textContent = 'Creating account…';
-  try{
-    await new Promise(r => setTimeout(r, 800));
-    showToast('Account created!');
-    // window.location.href = 'dashboard.html';
-  }catch(err){ showError(err.message || 'Could not create account'); }
-  finally{ btn.disabled = false; btn.textContent = 'Create account'; }
-});
-
-/* ===== Enter Key ===== */
-document.querySelector('.right-panel').addEventListener('keydown', e => {
-  if (e.key !== 'Enter') return;
-  if (!signupForm.classList.contains('hidden')) document.getElementById('signupBtn').click();
-  else document.getElementById('loginBtn').click();
-});
-
-/* ===== Toast ===== */
-let toastTimer;
-function showToast(msg){
-  let t = document.getElementById('toast');
-  if (!t){
-    t = document.createElement('div');
-    t.id = 'toast';
-    t.style.cssText = 'position:fixed; bottom:22px; right:22px; background:#171C25; border:1px solid #232935; color:#E8EDF2; padding:12px 16px; border-radius:9px; font-size:13px; z-index:200; opacity:0; transform:translateY(8px); transition:all .25s; box-shadow:0 8px 24px rgba(0,0,0,.4); font-family:Inter,sans-serif;';
-    document.body.appendChild(t);
-  }
-  t.textContent = msg; t.style.opacity = '1'; t.style.transform = 'translateY(0)';
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translateY(8px)'; }, 3000);
+function toggleAdminCodeField(){
+  const isAdminChoice = document.getElementById('authSignupRole').value === 'Admin';
+  document.getElementById('authAdminCodeField').style.display = isAdminChoice ? 'block' : 'none';
+  if (!isAdminChoice) document.getElementById('authAdminCode').value = '';
 }
 
-/* ===== Carousel Dots Animation ===== */
-const dots = document.querySelectorAll('.carousel-dot');
-let dotIndex = 2;
-setInterval(() => {
-  dots.forEach(d => d.classList.remove('active'));
-  dotIndex = (dotIndex + 1) % dots.length;
-  dots[dotIndex].classList.add('active');
-}, 4000);
+async function handleLogin(){
+  hideAuthError();
+  const email = document.getElementById('authLoginEmail').value.trim();
+  const password = document.getElementById('authLoginPassword').value;
+  if (!email || !password){ showAuthError('Enter your email and password.'); return; }
+  const btn = document.getElementById('authLoginBtn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try{
+    const res = await apiPost({ type:'agents', action:'login', data:{ Email: email, Password: password } });
+    session = res.agent;
+    localStorage.setItem('crmSession', JSON.stringify(session));
+    hideAuthScreen();
+    updateSidebarUser();
+    await loadAll();
+    resetInactivityTimer();
+    showToast('Welcome back, ' + (session.Name || session.Email));
+  }catch(err){ showAuthError(err.message || 'Could not sign in'); }
+  finally{ btn.disabled = false; btn.textContent = 'Sign in'; }
+}
+
+async function handleSignup(){
+  hideAuthError();
+  const name = document.getElementById('authSignupName').value.trim();
+  const email = document.getElementById('authSignupEmail').value.trim();
+  const role = document.getElementById('authSignupRole').value;
+  const adminCode = document.getElementById('authAdminCode').value;
+  const password = document.getElementById('authSignupPassword').value;
+  const confirm = document.getElementById('authSignupConfirm').value;
+  if (!name || !email || !password){ showAuthError('Fill in your name, email, and password.'); return; }
+  if (password.length < 6){ showAuthError('Password must be at least 6 characters.'); return; }
+  if (password !== confirm){ showAuthError('Passwords do not match.'); return; }
+  if (role === 'Admin' && !adminCode){ showAuthError('Enter the admin invite code, or sign up as an Agent instead.'); return; }
+  const btn = document.getElementById('authSignupBtn');
+  btn.disabled = true; btn.textContent = 'Creating account…';
+  try{
+    const res = await apiPost({ type:'agents', action:'signup', data:{ Name:name, Email:email, Role:role, AdminCode:adminCode, Password:password, Active:'Yes' } });
+    session = res.agent;
+    localStorage.setItem('crmSession', JSON.stringify(session));
+    hideAuthScreen();
+    updateSidebarUser();
+    await loadAll();
+    resetInactivityTimer();
+    showToast('Account created — welcome, ' + (session.Name || session.Email));
+  }catch(err){ showAuthError(err.message || 'Could not create account'); }
+  finally{ btn.disabled = false; btn.textContent = 'Create account'; }
+}
+
+function logout(){
+  session = null;
+  stopInactivityTimer();
+  localStorage.removeItem('crmSession');
+  document.getElementById('authLoginEmail').value = '';
+  document.getElementById('authLoginPassword').value = '';
+  switchAuthTab('login');
+  showAuthScreen();
+}
+
+function updateSidebarUser(){
+  const el = document.getElementById('sidebarUserInfo');
+  if (!session){ el.innerHTML = ''; return; }
+  el.innerHTML = `<div style="font-weight:600; color:var(--text); font-size:12.5px;">${escapeHtml(session.Name || session.Email)}</div>
+    <div style="font-size:11px;">${escapeHtml(session.Email)}${session.Role ? ' · ' + escapeHtml(session.Role) : ''}</div>`;
+  applyRoleVisibility();
+}
+
+function applyRoleVisibility(){
+  const admin = session && isAdminRole(session.Role);
+  document.querySelector('.nav-item[data-view="agents"]').style.display = admin ? '' : 'none';
+  document.querySelector('.nav-item[data-view="roles"]').style.display = admin ? '' : 'none';
+  document.getElementById('filterAgent').style.display = admin ? '' : 'none';
+  if (!admin && (currentView === 'agents' || currentView === 'roles')) switchView('home');
+}
+
+/* ============ NAV ============ */
+function bindNav(){
+  document.querySelectorAll('.nav-item').forEach(btn => {
+    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  });
+  document.getElementById('refreshBtn').addEventListener('click', loadAll);
+  document.getElementById('newLeadBtn').addEventListener('click', () => {
+    switchView('leads');
+    openLeadModal(null);
+  });
+
+  document.querySelectorAll('.subtab-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchLeadSub(btn.dataset.sub));
+  });
+
+  ['searchInput','filterAgent','filterAssignment','filterStatus'].forEach(id => {
+    document.getElementById(id).addEventListener('input', renderCurrentView);
+    document.getElementById(id).addEventListener('change', renderCurrentView);
+  });
+}
+
+const VIEW_META = {
+  home: ['Home','Overview of credit card leads'],
+  leads: ['Leads','All leads, their statuses, and CSV import'],
+  dashboards: ['Dashboards','Lead performance at a glance'],
+  agents: ['Agents','Manage the agent roster'],
+  roles: ['Team Roles','Define roles used across the platform'],
+  settings: ['Settings','Connect this platform to your Google Sheet']
+};
+
+function switchView(view){
+  currentView = view;
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.getElementById('topbarTitle').textContent = VIEW_META[view][0];
+  const admin = session && isAdminRole(session.Role);
+  document.getElementById('topbarCrumb').textContent = (view === 'leads' && !admin)
+    ? 'Your leads and their statuses'
+    : VIEW_META[view][1];
+  renderCurrentView();
+}
+
+function switchLeadSub(sub){
+  currentLeadSub = sub;
+  document.querySelectorAll('.subtab-btn').forEach(b => b.classList.toggle('active', b.dataset.sub === sub));
+  document.querySelectorAll('.subtab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('sub-' + sub).classList.add('active');
+  renderCurrentView();
+}
+
+function renderCurrentView(){
+  document.getElementById('navLeadsCount').textContent = leads.length;
+  document.getElementById('navAgentsCount').textContent = agents.length;
+
+  if (currentView === 'home') renderHome();
+  else if (currentView === 'leads'){
+    document.getElementById('countPill').textContent = `${getFilteredLeads().length} leads`;
+    if (currentLeadSub === 'table') renderTable();
+    else if (currentLeadSub === 'kanban') renderKanban();
+  }
+  else if (currentView === 'dashboards') renderDashboards();
+  else if (currentView === 'agents') renderAgentsTable();
+  else if (currentView === 'roles') renderRolesTable();
+}
+
+/* ============ GENERIC API ============ */
+async function apiGet(type, extraParams){
+  if (!CONFIG.webAppUrl) return [];
+  let url = CONFIG.webAppUrl + '?type=' + type;
+  if (extraParams){
+    Object.keys(extraParams).forEach(k => {
+      if (extraParams[k]) url += '&' + k + '=' + encodeURIComponent(extraParams[k]);
+    });
+  }
+  const res = await fetch(url);
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || ('Failed to load ' + type));
+  return json.items || [];
+}
+async function apiPost(payload){
+  if (!CONFIG.webAppUrl) throw new Error('Web App URL not configured yet — set it up in Settings');
+  const res = await fetch(CONFIG.webAppUrl, {
+    method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(payload)
+  });
+  const json = await res.json();
+  if (!json.ok) throw new Error(json.error || 'Request failed');
+  return json;
+}
+
+async function loadLeads(){
+  try{
+    const params = (session && !isAdminRole(session.Role)) ? { agentEmail: session.Email } : {};
+    leads = CONFIG.webAppUrl ? await apiGet('leads', params) : [];
+    updateConnBadge(true);
+  }
+  catch(err){ updateConnBadge(false); showToast('Could not load leads: ' + err.message, true); }
+}
+function isAdminRole(role){ return (role || '').trim().toLowerCase() === 'admin'; }
+async function loadAgents(){
+  try{ agents = CONFIG.webAppUrl ? await apiGet('agents') : []; }
+  catch(err){ showToast('Could not load agents: ' + err.message, true); }
+}
+async function loadRoles(){
+  try{ roles = CONFIG.webAppUrl ? await apiGet('roles') : []; }
+  catch(err){ showToast('Could not load roles: ' + err.message, true); }
+}
+
+function updateConnBadge(ok){
+  const dot = document.getElementById('connDot');
+  const label = document.getElementById('connLabel');
+  dot.className = 'conn-dot' + (ok === true ? ' ok' : ok === false ? ' bad' : '');
+  label.textContent = ok === true ? 'Connected' : ok === false ? 'Connection failed' : (CONFIG.webAppUrl ? 'Connecting…' : 'Not connected');
+}
+
+function populateDropdowns(){
+  const isAdmin = session && isAdminRole(session.Role);
+  // filters
+  fillSelect('filterAgent', agents.map(a => a.Email), 'All agents', true);
+  fillSelect('filterAssignment', ASSIGNMENTS, 'All assignments', true);
+  fillSelect('filterStatus', CALL_STATUSES, 'All statuses', true);
+
+  // Agent-assignment dropdowns: Admins can assign to anyone; everyone else is locked to themselves
+  const activeAgents = agents.filter(a => (a.Active || 'Yes') !== 'No');
+  const selfMatch = session ? activeAgents.filter(a => (a.Email || '').toLowerCase() === (session.Email || '').toLowerCase()) : [];
+  const agentOptions = isAdmin ? activeAgents : (selfMatch.length ? selfMatch : activeAgents);
+
+  fillSelect('leadAgentSelect', agentOptions.map(a => a.Email), isAdmin ? 'Select agent' : null, false, agentOptions);
+  fillSelect('importDefaultAgent', agentOptions.map(a => a.Email), null, false, agentOptions);
+  const importSel = document.getElementById('importDefaultAgent');
+  if (session && session.Email && [...importSel.options].some(o => o.value === session.Email)){
+    importSel.value = session.Email;
+  }
+
+  // agent form role select
+  fillSelect('agentRoleSelect', roles.map(r => r['Role Name']), null, false);
+}
+function fillSelect(id, values, placeholder, keepPlaceholderOnly, richAgents){
+  const sel = document.getElementById(id);
+  const current = sel.value;
+  sel.innerHTML = '';
+  if (placeholder) sel.insertAdjacentHTML('beforeend', `<option value="">${placeholder}</option>`);
+  values.forEach((v, i) => {
+    if (!v) return;
+    const label = richAgents ? `${richAgents[i].Name || v} (${v})` : v;
+    sel.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(v)}">${escapeHtml(label)}</option>`);
+  });
+  if ([...sel.options].some(o => o.value === current)) sel.value = current;
+}
+
+/* ============ HOME ============ */
+function renderHome(){
+  const total = leads.length;
+  const converted = leads.filter(l => l['CALL STATUS'] === 'Converted').length;
+  const now = new Date(); const in7 = new Date(now.getTime() + 7*86400000);
+  const followups = leads.filter(l => {
+    const d = l['FOLLOW - UP DATE / CLOSE DATE'];
+    if (!d) return false;
+    const dt = new Date(d);
+    return !isNaN(dt) && dt >= now && dt <= in7;
+  }).length;
+  const activeAgents = agents.filter(a => (a.Active || 'Yes') !== 'No').length;
+
+  document.getElementById('statTotal').textContent = total;
+  document.getElementById('statConverted').textContent = converted;
+  document.getElementById('statConvertedRate').textContent = (total ? Math.round(converted/total*100) : 0) + '% conversion';
+  document.getElementById('statFollowups').textContent = followups;
+  document.getElementById('statAgents').textContent = activeAgents;
+  document.getElementById('statAgentsSub').textContent = 'of ' + agents.length + ' total';
+
+  const breakdown = document.getElementById('statusBreakdown');
+  if (!leads.length){
+    breakdown.innerHTML = '<div style="color:var(--text-faint); font-size:12.5px;">No leads yet.</div>';
+  } else {
+    breakdown.innerHTML = CALL_STATUSES.map(s => {
+      const n = leads.filter(l => (l['CALL STATUS'] || 'Not Contacted') === s).length;
+      const pct = total ? Math.round(n/total*100) : 0;
+      return `<div class="status-bar-row">
+        <span class="label">${escapeHtml(s)}</span>
+        <span class="status-bar-track"><span class="status-bar-fill" style="width:${pct}%; background:${STATUS_COLORS[s]};"></span></span>
+        <span class="n">${n}</span>
+      </div>`;
+    }).join('');
+  }
+
+  const recent = [...leads].sort((a,b) => (b.row||0) - (a.row||0)).slice(0,6);
+  const recentEl = document.getElementById('recentLeads');
+  recentEl.innerHTML = recent.length ? recent.map(l => `
+    <div class="recent-item">
+      <div><div class="name">${escapeHtml(l['Customer Name'] || 'Unnamed')}</div><div class="meta">${escapeHtml(shortAgent(l['Agents']))} · ${escapeHtml(l['ASSIGNMENTS'] || '—')}</div></div>
+      <span class="status-pill" style="color:${STATUS_COLORS[l['CALL STATUS']||'Not Contacted']}; background:${STATUS_COLORS[l['CALL STATUS']||'Not Contacted']}22;">${escapeHtml(l['CALL STATUS'] || 'Not Contacted')}</span>
+    </div>`).join('') : '<div style="color:var(--text-faint); font-size:12.5px;">No leads yet.</div>';
+}
+
+/* ============ LEADS: FILTER / TABLE / KANBAN ============ */
+function getFilteredLeads(){
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const agent = document.getElementById('filterAgent').value;
+  const assignment = document.getElementById('filterAssignment').value;
+  const status = document.getElementById('filterStatus').value;
+  return leads.filter(l => {
+    if (agent && l['Agents'] !== agent) return false;
+    if (assignment && l['ASSIGNMENTS'] !== assignment) return false;
+    if (status && (l['CALL STATUS'] || 'Not Contacted') !== status) return false;
+    if (q){
+      const hay = [l['Customer Name'], l['Phone Number'], l['Email'], l['User_ID']].map(v => (v||'').toString().toLowerCase()).join(' ');
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderTable(){
+  const tbody = document.getElementById('tableBody');
+  const rows = getFilteredLeads();
+  if (!rows.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No leads match your filters.</td></tr>'; return; }
+  tbody.innerHTML = rows.map(l => {
+    const status = l['CALL STATUS'] || 'Not Contacted';
+    const color = STATUS_COLORS[status] || '#8B96A5';
+    return `<tr class="clickable" data-row="${l.row}">
+      <td><strong>${escapeHtml(l['Customer Name'] || '—')}</strong></td>
+      <td class="mono">${escapeHtml(l['Phone Number'] || '—')}</td>
+      <td>${escapeHtml(shortAgent(l['Agents']))}</td>
+      <td>${escapeHtml(l['ASSIGNMENTS'] || '—')}</td>
+      <td><span class="status-pill" style="color:${color}; background:${color}22;">${escapeHtml(status)}</span></td>
+      <td>${escapeHtml(formatDateTime(l['Status Updated At']))}</td>
+      <td>${escapeHtml(l['FOLLOW - UP DATE / CLOSE DATE'] || '—')}</td>
+      <td class="mono">${formatMoney(l['Credit Limit'])}</td>
+      <td>${escapeHtml(l['CONTACT DATE'] || '—')}</td>
+      <td>${escapeHtml(formatDateTime(l['Created_at']))}</td>
+    </tr>`;
+  }).join('');
+  tbody.querySelectorAll('tr[data-row]').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const lead = leads.find(l => l.row === parseInt(tr.dataset.row,10));
+      if (lead) openLeadModal(lead);
+    });
+  });
+}
+
+function renderKanban(){
+  const board = document.getElementById('kanbanBoard');
+  const rows = getFilteredLeads();
+  board.innerHTML = CALL_STATUSES.map(status => {
+    const cards = rows.filter(l => (l['CALL STATUS'] || 'Not Contacted') === status);
+    const color = STATUS_COLORS[status];
+    return `<div class="kanban-col" data-status="${escapeHtml(status)}">
+      <div class="kanban-col-head" style="border-top-color:${color};"><span>${escapeHtml(status)}</span><span class="count-pill" style="padding:2px 8px;">${cards.length}</span></div>
+      <div class="kanban-col-body" data-status="${escapeHtml(status)}">
+        ${cards.map(l => `<div class="kcard" draggable="true" data-row="${l.row}">
+          <div class="kname">${escapeHtml(l['Customer Name'] || 'Unnamed')}</div>
+          <div class="kmeta"><span>${escapeHtml(l['Phone Number'] || '—')}</span><span>${escapeHtml(shortAgent(l['Agents']))}</span>
+          ${l['Status Updated At'] ? `<span>Updated: ${escapeHtml(formatDateTime(l['Status Updated At']))}</span>` : ''}
+          ${l['FOLLOW - UP DATE / CLOSE DATE'] ? `<span>Follow-up: ${escapeHtml(l['FOLLOW - UP DATE / CLOSE DATE'])}</span>` : ''}</div>
+          <span class="kbadge">${escapeHtml(l['ASSIGNMENTS'] || '—')}</span>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+
+  board.querySelectorAll('.kcard').forEach(card => {
+    card.addEventListener('click', () => {
+      const lead = leads.find(l => l.row === parseInt(card.dataset.row,10));
+      if (lead) openLeadModal(lead);
+    });
+    card.addEventListener('dragstart', () => card.classList.add('dragging'));
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+  });
+  board.querySelectorAll('.kanban-col-body').forEach(col => {
+    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('drag-over'); });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault(); col.classList.remove('drag-over');
+      const dragging = board.querySelector('.kcard.dragging');
+      if (!dragging) return;
+      const row = parseInt(dragging.dataset.row,10);
+      const newStatus = col.dataset.status;
+      const lead = leads.find(l => l.row === row);
+      if (!lead || lead['CALL STATUS'] === newStatus) return;
+      const stamp = nowForDatetimeLocal();
+      lead['CALL STATUS'] = newStatus;
+      lead['Status Updated At'] = stamp;
+      renderKanban();
+      try{
+        await apiPost({type:'leads', action:'update', row, data:{'CALL STATUS': newStatus, 'Status Updated At': stamp}});
+        showToast(`Moved to "${newStatus}"`);
+      }
+      catch(err){ showToast('Could not update status: ' + err.message, true); loadLeads().then(renderKanban); }
+    });
+  });
+}
+
+/* ============ LEAD MODAL ============ */
+function bindLeadEvents(){
+  document.getElementById('saveLeadBtn').addEventListener('click', saveLead);
+  // Default "Status Updated At" to now whenever the call status is changed in the form —
+  // the field stays editable so this can still be overridden before saving.
+  document.getElementById('leadCallStatusSelect').addEventListener('change', () => {
+    document.getElementById('leadStatusUpdatedInput').value = nowForDatetimeLocal();
+  });
+  bindModalClosers();
+}
+function bindModalClosers(){
+  document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => closeModal(btn.dataset.close));
+  });
+  document.querySelectorAll('.modal-overlay').forEach(ov => {
+    ov.addEventListener('click', e => { if (e.target === ov) closeModal(ov.id); });
+  });
+}
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function openLeadModal(lead){
+  editingLeadRow = lead ? lead.row : null;
+  editingLeadOriginalStatus = lead ? (lead['CALL STATUS'] || 'Not Contacted') : null;
+  document.getElementById('leadModalTitle').textContent = lead ? 'Edit Lead' : 'New Lead';
+  const form = document.getElementById('leadForm');
+  form.reset();
+  if (lead){
+    Object.keys(lead).forEach(key => {
+      const el = form.elements[key];
+      if (!el) return;
+      el.value = (el.type === 'datetime-local' && lead[key]) ? toDatetimeLocal(lead[key]) : (lead[key] || '');
+    });
+  } else if (session && session.Email){
+    // Auto-fill the logged-in agent so they don't have to pick themselves each time
+    form.elements['Agents'].value = session.Email;
+  }
+  document.getElementById('leadModalOverlay').classList.add('open');
+}
+
+async function saveLead(){
+  const form = document.getElementById('leadForm');
+  if (!form.checkValidity()){ form.reportValidity(); return; }
+  const data = {};
+  new FormData(form).forEach((v,k) => data[k] = v);
+  if (!data['CALL STATUS']) data['CALL STATUS'] = 'Not Contacted';
+
+  // Default "Status Updated At" to now if the call status changed (new lead, or edited)
+  // and the field was left blank — it's always editable, this is just the default.
+  const statusChanged = editingLeadOriginalStatus === null || data['CALL STATUS'] !== editingLeadOriginalStatus;
+  if (statusChanged && !data['Status Updated At']){
+    data['Status Updated At'] = nowForDatetimeLocal();
+  }
+
+  const btn = document.getElementById('saveLeadBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    if (editingLeadRow) await apiPost({type:'leads', action:'update', row:editingLeadRow, data});
+    else await apiPost({type:'leads', action:'create', data});
+    showToast(editingLeadRow ? 'Lead updated' : 'Lead created');
+    closeModal('leadModalOverlay');
+    await loadLeads(); renderCurrentView();
+  }catch(err){ showToast('Save failed: ' + err.message, true); }
+  finally{ btn.disabled = false; btn.textContent = 'Save Lead'; }
+}
+
+/* ============ DASHBOARDS ============ */
+function renderDashboards(){
+  destroyCharts();
+  const ctxStatus = document.getElementById('chartStatus');
+  const statusCounts = CALL_STATUSES.map(s => leads.filter(l => (l['CALL STATUS']||'Not Contacted') === s).length);
+  charts.status = new Chart(ctxStatus, { type:'doughnut', data:{ labels:CALL_STATUSES, datasets:[{ data:statusCounts, backgroundColor:CALL_STATUSES.map(s=>STATUS_COLORS[s]), borderWidth:0 }]}, options: chartOpts(true) });
+
+  const asgCounts = ASSIGNMENTS.map(a => leads.filter(l => l['ASSIGNMENTS'] === a).length);
+  charts.assignment = new Chart(document.getElementById('chartAssignment'), { type:'bar', data:{ labels:ASSIGNMENTS, datasets:[{ data:asgCounts, backgroundColor:'#00D4A0', borderRadius:6 }]}, options: chartOpts(false) });
+
+  const agentEmails = [...new Set(leads.map(l => l['Agents']).filter(Boolean))];
+  const agentCounts = agentEmails.map(e => leads.filter(l => l['Agents'] === e).length);
+  charts.agent = new Chart(document.getElementById('chartAgent'), { type:'bar', data:{ labels: agentEmails.map(shortAgent), datasets:[{ data:agentCounts, backgroundColor:'#5B9DFF', borderRadius:6 }]}, options:{...chartOpts(false), indexAxis:'y'} });
+
+  const days = [...Array(14)].map((_,i)=>{ const d=new Date(); d.setDate(d.getDate()-(13-i)); return d; });
+  const dayLabels = days.map(d => d.toLocaleDateString(undefined,{month:'short',day:'numeric'}));
+  const dayCounts = days.map(d => leads.filter(l => {
+    const c = l['Created_at']; if (!c) return false;
+    const cd = new Date(c); return !isNaN(cd) && cd.toDateString() === d.toDateString();
+  }).length);
+  charts.trend = new Chart(document.getElementById('chartTrend'), { type:'line', data:{ labels:dayLabels, datasets:[{ data:dayCounts, borderColor:'#00D4A0', backgroundColor:'rgba(0,212,160,0.12)', fill:true, tension:.35, pointRadius:2 }]}, options: chartOpts(false) });
+}
+function chartOpts(isDoughnut){
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{ legend:{ display:isDoughnut, position:'bottom', labels:{ color:'#8B96A5', boxWidth:10, font:{size:11} } } },
+    scales: isDoughnut ? {} : {
+      x:{ ticks:{ color:'#8B96A5', font:{size:11} }, grid:{ color:'#232935' } },
+      y:{ ticks:{ color:'#8B96A5', font:{size:11} }, grid:{ color:'#232935' }, beginAtZero:true }
+    }
+  };
+}
+function destroyCharts(){ Object.values(charts).forEach(c => c && c.destroy()); charts = {}; }
+
+/* ============ AGENTS ============ */
+function bindAgentEvents(){
+  document.getElementById('newAgentBtn').addEventListener('click', () => openAgentModal(null));
+  document.getElementById('saveAgentBtn').addEventListener('click', saveAgent);
+}
+function renderAgentsTable(){
+  document.getElementById('agentsCountPill').textContent = agents.length + ' agents';
+  const tbody = document.getElementById('agentsTableBody');
+  if (!agents.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="5">No agents yet.</td></tr>'; return; }
+  tbody.innerHTML = agents.map(a => `
+    <tr>
+      <td><strong>${escapeHtml(a.Name || '—')}</strong></td>
+      <td class="mono">${escapeHtml(a.Email || '—')}</td>
+      <td>${escapeHtml(a.Role || '—')}</td>
+      <td><span class="yn-pill ${(a.Active||'Yes')==='No' ? 'no':'yes'}">${escapeHtml(a.Active || 'Yes')}</span></td>
+      <td><div class="row-actions">
+        <button class="icon-btn" data-edit="${a.row}">${editIcon()}</button>
+        <button class="icon-btn danger" data-del="${a.row}">${trashIcon()}</button>
+      </div></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openAgentModal(agents.find(a=>a.row===parseInt(b.dataset.edit,10)))));
+  tbody.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteEntity('agents', parseInt(b.dataset.del,10), loadAgents)));
+}
+function openAgentModal(agent){
+  editingAgentRow = agent ? agent.row : null;
+  document.getElementById('agentModalTitle').textContent = agent ? 'Edit Agent' : 'New Agent';
+  const form = document.getElementById('agentForm');
+  form.reset();
+  const pwLabel = document.getElementById('agentPasswordLabel');
+  const pwInput = document.getElementById('agentPasswordInput');
+  if (agent){
+    ['Name','Email','Role','Active'].forEach(k => { if (form.elements[k]) form.elements[k].value = agent[k] || ''; });
+    pwLabel.textContent = 'New password (leave blank to keep current)';
+    pwInput.required = false;
+  } else {
+    pwLabel.textContent = 'Password';
+    pwInput.required = true;
+  }
+  document.getElementById('agentModalOverlay').classList.add('open');
+}
+async function saveAgent(){
+  const form = document.getElementById('agentForm');
+  if (!form.checkValidity()){ form.reportValidity(); return; }
+  const data = {}; new FormData(form).forEach((v,k)=>data[k]=v);
+  if (!data.Password) delete data.Password; // don't overwrite an existing password with a blank one
+  else if (data.Password.length < 6){ showToast('Password must be at least 6 characters', true); return; }
+  const btn = document.getElementById('saveAgentBtn'); btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    if (editingAgentRow) await apiPost({type:'agents', action:'update', row:editingAgentRow, data});
+    else await apiPost({type:'agents', action:'create', data});
+    showToast(editingAgentRow ? 'Agent updated' : 'Agent added');
+    closeModal('agentModalOverlay');
+    await loadAgents(); populateDropdowns(); renderCurrentView();
+  }catch(err){ showToast('Save failed: ' + err.message, true); }
+  finally{ btn.disabled = false; btn.textContent = 'Save Agent'; }
+}
+
+/* ============ ROLES ============ */
+function bindRoleEvents(){
+  document.getElementById('newRoleBtn').addEventListener('click', () => openRoleModal(null));
+  document.getElementById('saveRoleBtn').addEventListener('click', saveRole);
+}
+function renderRolesTable(){
+  document.getElementById('rolesCountPill').textContent = roles.length + ' roles';
+  const tbody = document.getElementById('rolesTableBody');
+  if (!roles.length){ tbody.innerHTML = '<tr class="empty-row"><td colspan="3">No roles yet.</td></tr>'; return; }
+  tbody.innerHTML = roles.map(r => `
+    <tr>
+      <td><strong>${escapeHtml(r['Role Name'] || '—')}</strong></td>
+      <td>${escapeHtml(r['Description'] || '—')}</td>
+      <td><div class="row-actions">
+        <button class="icon-btn" data-edit="${r.row}">${editIcon()}</button>
+        <button class="icon-btn danger" data-del="${r.row}">${trashIcon()}</button>
+      </div></td>
+    </tr>`).join('');
+  tbody.querySelectorAll('[data-edit]').forEach(b => b.addEventListener('click', () => openRoleModal(roles.find(r=>r.row===parseInt(b.dataset.edit,10)))));
+  tbody.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => deleteEntity('roles', parseInt(b.dataset.del,10), loadRoles)));
+}
+function openRoleModal(role){
+  editingRoleRow = role ? role.row : null;
+  document.getElementById('roleModalTitle').textContent = role ? 'Edit Role' : 'New Role';
+  const form = document.getElementById('roleForm');
+  form.reset();
+  if (role){ ['Role Name','Description'].forEach(k => { if (form.elements[k]) form.elements[k].value = role[k] || ''; }); }
+  document.getElementById('roleModalOverlay').classList.add('open');
+}
+async function saveRole(){
+  const form = document.getElementById('roleForm');
+  if (!form.checkValidity()){ form.reportValidity(); return; }
+  const data = {}; new FormData(form).forEach((v,k)=>data[k]=v);
+  const btn = document.getElementById('saveRoleBtn'); btn.disabled = true; btn.textContent = 'Saving…';
+  try{
+    if (editingRoleRow) await apiPost({type:'roles', action:'update', row:editingRoleRow, data});
+    else await apiPost({type:'roles', action:'create', data});
+    showToast(editingRoleRow ? 'Role updated' : 'Role added');
+    closeModal('roleModalOverlay');
+    await loadRoles(); populateDropdowns(); renderCurrentView();
+  }catch(err){ showToast('Save failed: ' + err.message, true); }
+  finally{ btn.disabled = false; btn.textContent = 'Save Role'; }
+}
+
+async function deleteEntity(type, row, reload){
+  if (!confirm('Delete this ' + type.slice(0,-1) + '? This cannot be undone.')) return;
+  try{
+    await apiPost({type, action:'delete', row});
+    showToast('Deleted');
+    await reload(); populateDropdowns(); renderCurrentView();
+  }catch(err){ showToast('Delete failed: ' + err.message, true); }
+}
+
+/* ============ CSV IMPORT ============ */
+function bindImportEvents(){
+  const dz = document.getElementById('dropzone');
+  const input = document.getElementById('csvInput');
+  dz.addEventListener('click', () => input.click());
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) handleCsvFile(e.dataTransfer.files[0]);
+  });
+  input.addEventListener('change', () => { if (input.files.length) handleCsvFile(input.files[0]); });
+
+  document.getElementById('cancelImportBtn').addEventListener('click', resetImport);
+  document.getElementById('confirmImportBtn').addEventListener('click', runImport);
+}
+
+function handleCsvFile(file){
+  document.getElementById('csvFileName').textContent = file.name;
+  Papa.parse(file, {
+    header: true, skipEmptyLines: true,
+    complete: (results) => {
+      csvRows = results.data;
+      csvHeaders = results.meta.fields || [];
+      if (!csvRows.length){ showToast('That CSV appears to be empty', true); return; }
+      buildMapping();
+      document.getElementById('csvRowCount').textContent = csvRows.length;
+      document.getElementById('importMappingBlock').style.display = 'block';
+    },
+    error: (err) => showToast('Could not parse CSV: ' + err.message, true)
+  });
+}
+
+function normalizeHeader(h){ return (h||'').toString().toLowerCase().replace(/[^a-z0-9]/g,''); }
+
+function buildMapping(){
+  columnMapping = {};
+  IMPORTABLE_HEADERS.forEach(target => {
+    const normTarget = normalizeHeader(target);
+    const match = csvHeaders.find(h => normalizeHeader(h) === normTarget);
+    columnMapping[target] = match || '';
+  });
+  renderMappingGrid();
+  renderPreview();
+}
+
+function renderMappingGrid(){
+  const grid = document.getElementById('mappingGrid');
+  grid.innerHTML = IMPORTABLE_HEADERS.map(target => `
+    <div class="mapping-field">
+      <label>${escapeHtml(target)}</label>
+      <select data-target="${escapeHtml(target)}">
+        <option value="">— skip —</option>
+        ${csvHeaders.map(h => `<option value="${escapeHtml(h)}" ${columnMapping[target]===h?'selected':''}>${escapeHtml(h)}</option>`).join('')}
+      </select>
+    </div>`).join('');
+  grid.querySelectorAll('select').forEach(sel => {
+    sel.addEventListener('change', () => { columnMapping[sel.dataset.target] = sel.value; renderPreview(); });
+  });
+}
+
+function renderPreview(){
+  const table = document.getElementById('previewTable');
+  const mappedTargets = IMPORTABLE_HEADERS.filter(t => columnMapping[t]);
+  const thead = table.querySelector('thead');
+  const tbody = table.querySelector('tbody');
+  thead.innerHTML = '<tr>' + mappedTargets.map(t => `<th>${escapeHtml(t)}</th>`).join('') + '</tr>';
+  const preview = csvRows.slice(0, 5);
+  tbody.innerHTML = preview.map(row => '<tr>' + mappedTargets.map(t => `<td>${escapeHtml(row[columnMapping[t]] ?? '')}</td>`).join('') + '</tr>').join('')
+    || '<tr class="empty-row"><td>No rows</td></tr>';
+}
+
+async function runImport(){
+  const mappedTargets = IMPORTABLE_HEADERS.filter(t => columnMapping[t]);
+  if (!mappedTargets.length){ showToast('Map at least one column before importing', true); return; }
+
+  const defaultAgent = document.getElementById('importDefaultAgent').value || (session && session.Email) || '';
+  const dataRows = csvRows.map(row => {
+    const obj = {};
+    mappedTargets.forEach(t => { obj[t] = (row[columnMapping[t]] ?? '').toString(); });
+    if (!obj['CALL STATUS']) obj['CALL STATUS'] = 'Not Contacted';
+    if (!obj['Status Updated At']) obj['Status Updated At'] = nowForDatetimeLocal();
+    if (!obj['Agents'] && defaultAgent) obj['Agents'] = defaultAgent;
+    return obj;
+  });
+
+  const btn = document.getElementById('confirmImportBtn');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  const track = document.getElementById('importProgressTrack');
+  const fill = document.getElementById('importProgressFill');
+  track.style.display = 'block';
+
+  const BATCH = 200;
+  let done = 0;
+  try{
+    for (let i = 0; i < dataRows.length; i += BATCH){
+      const batch = dataRows.slice(i, i + BATCH);
+      await apiPost({ type:'leads', action:'bulkCreate', rows: batch });
+      done += batch.length;
+      fill.style.width = Math.round(done / dataRows.length * 100) + '%';
+    }
+    showToast(`Imported ${dataRows.length} leads`);
+    resetImport();
+    await loadLeads(); renderCurrentView();
+  }catch(err){
+    showToast('Import failed: ' + err.message, true);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Import leads';
+    track.style.display = 'none'; fill.style.width = '0%';
+  }
+}
+
+function resetImport(){
+  csvRows = []; csvHeaders = []; columnMapping = {};
+  document.getElementById('csvInput').value = '';
+  document.getElementById('importMappingBlock').style.display = 'none';
+}
+
+/* ============ SETTINGS ============ */
+function bindSettingsEvents(){
+  document.getElementById('saveUrlBtn').addEventListener('click', async () => {
+    const url = document.getElementById('webAppUrlInput').value.trim();
+    CONFIG.webAppUrl = url;
+    localStorage.setItem('crmWebAppUrl', url);
+    document.getElementById('configBanner').style.display = url ? 'none' : 'block';
+    showToast('Web App URL saved');
+    await loadAll();
+    testConnection();
+  });
+  document.getElementById('testConnBtn').addEventListener('click', testConnection);
+}
+async function testConnection(){
+  const statusEl = document.getElementById('settingsConnStatus');
+  statusEl.textContent = 'Testing…';
+  try{
+    await apiGet('leads');
+    updateConnBadge(true);
+    statusEl.innerHTML = '<span class="conn-dot ok"></span> Connected successfully';
+  }catch(err){
+    updateConnBadge(false);
+    statusEl.innerHTML = '<span class="conn-dot bad"></span> ' + escapeHtml(err.message);
+  }
+}
+
+/* ============ HELPERS ============ */
+function escapeHtml(str){
+  if (str === null || str === undefined) return '';
+  return str.toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+function shortAgent(email){ return email ? email.split('@')[0] : '—'; }
+function formatMoney(v){ if (v==='' || v===undefined || v===null || isNaN(v)) return '—'; return '₦' + Number(v).toLocaleString(); }
+function toDatetimeLocal(value){
+  const d = new Date(value); if (isNaN(d.getTime())) return '';
+  const pad = n => n.toString().padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function nowForDatetimeLocal(){ return toDatetimeLocal(new Date()); }
+function formatDateTime(value){
+  if (!value) return '—';
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value;
+  const pad = n => n.toString().padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function editIcon(){ return '<svg class="icon" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>'; }
+function trashIcon(){ return '<svg class="icon" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg>'; }
+
+let toastTimer;
+function showToast(msg, isError){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.toggle('error', !!isError); t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
 </script>
 </body>
 </html>
