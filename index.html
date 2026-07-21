@@ -274,7 +274,8 @@ window.__libsReady = Promise.all([
 
   .auth-shell{
     display:flex; width:100%; max-width:920px; min-height:0; margin:auto;
-    background:var(--surface); border:1px solid var(--border); border-radius:20px; overflow:hidden;
+    background:transparent;
+    border:1px solid var(--border); border-radius:20px; overflow:hidden;
     box-shadow:0 30px 80px rgba(0,0,0,0.5);
   }
 
@@ -302,7 +303,13 @@ window.__libsReady = Promise.all([
   .auth-dots span{width:14px; height:4px; border-radius:3px; background:rgba(255,255,255,0.35);}
   .auth-dots span.active{width:22px; background:#fff;}
 
-  .auth-panel{flex:1; min-width:0; padding:38px 42px; display:flex; flex-direction:column; justify-content:center; overflow-y:auto; max-height:88vh;}
+  .auth-panel{
+    flex:1; min-width:0; padding:38px 42px; display:flex; flex-direction:column;
+    justify-content:center; overflow-y:auto; max-height:88vh;
+    background:rgba(18,22,29,0.72);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+  }
   .auth-panel h2{font-size:21px; font-weight:700; margin-bottom:6px;}
   .auth-switch{font-size:12.5px; color:var(--text-dim); margin-bottom:22px;}
   .auth-link-btn{background:none; border:none; padding:0; margin:0; color:var(--accent); font-weight:600; font-size:inherit; font-family:inherit; cursor:pointer;}
@@ -337,7 +344,6 @@ window.__libsReady = Promise.all([
     .auth-panel{padding:30px 22px;}
   }
 </style>
-<base target="_blank">
 </head>
 <body>
 
@@ -833,8 +839,6 @@ async function loadAll(){
 
 /* ============ SESSION GUARDS: close-window + inactivity logout ============ */
 function bindSessionGuards(){
-  // Log out when the tab/window is closed (also fires on refresh/navigation,
-  // which is an accepted tradeoff of relying on beforeunload).
   window.addEventListener('beforeunload', () => {
     if (session) localStorage.removeItem('crmSession');
   });
@@ -887,7 +891,6 @@ function bindAuthEvents(){
     showToast('Connection saved');
     await loadRoles();
   });
-  // Enter key submits the active auth form
   document.getElementById('authScreen').addEventListener('keydown', e => {
     if (e.key !== 'Enter') return;
     const loginVisible = document.getElementById('authLoginForm').style.display !== 'none';
@@ -1114,12 +1117,10 @@ function updateConnBadge(ok){
 
 function populateDropdowns(){
   const isAdmin = session && isAdminRole(session.Role);
-  // filters
   fillSelect('filterAgent', agents.map(a => a.Email), 'All agents', true);
   fillSelect('filterAssignment', ASSIGNMENTS, 'All assignments', true);
   fillSelect('filterStatus', CALL_STATUSES, 'All statuses', true);
 
-  // Agent-assignment dropdowns: Admins can assign to anyone; everyone else is locked to themselves
   const activeAgents = agents.filter(a => (a.Active || 'Yes') !== 'No');
   const selfMatch = session ? activeAgents.filter(a => (a.Email || '').toLowerCase() === (session.Email || '').toLowerCase()) : [];
   const agentOptions = isAdmin ? activeAgents : (selfMatch.length ? selfMatch : activeAgents);
@@ -1131,7 +1132,6 @@ function populateDropdowns(){
     importSel.value = session.Email;
   }
 
-  // agent form role select
   fillSelect('agentRoleSelect', roles.map(r => r['Role Name']), null, false);
 }
 function fillSelect(id, values, placeholder, keepPlaceholderOnly, richAgents){
@@ -1292,8 +1292,6 @@ function renderKanban(){
 /* ============ LEAD MODAL ============ */
 function bindLeadEvents(){
   document.getElementById('saveLeadBtn').addEventListener('click', saveLead);
-  // Default "Status Updated At" to now whenever the call status is changed in the form —
-  // the field stays editable so this can still be overridden before saving.
   document.getElementById('leadCallStatusSelect').addEventListener('change', () => {
     document.getElementById('leadStatusUpdatedInput').value = nowForDatetimeLocal();
   });
@@ -1322,7 +1320,6 @@ function openLeadModal(lead){
       el.value = (el.type === 'datetime-local' && lead[key]) ? toDatetimeLocal(lead[key]) : (lead[key] || '');
     });
   } else if (session && session.Email){
-    // Auto-fill the logged-in agent so they don't have to pick themselves each time
     form.elements['Agents'].value = session.Email;
   }
   document.getElementById('leadModalOverlay').classList.add('open');
@@ -1335,8 +1332,6 @@ async function saveLead(){
   new FormData(form).forEach((v,k) => data[k] = v);
   if (!data['CALL STATUS']) data['CALL STATUS'] = 'Not Contacted';
 
-  // Default "Status Updated At" to now if the call status changed (new lead, or edited)
-  // and the field was left blank — it's always editable, this is just the default.
   const statusChanged = editingLeadOriginalStatus === null || data['CALL STATUS'] !== editingLeadOriginalStatus;
   if (statusChanged && !data['Status Updated At']){
     data['Status Updated At'] = nowForDatetimeLocal();
@@ -1432,7 +1427,7 @@ async function saveAgent(){
   const form = document.getElementById('agentForm');
   if (!form.checkValidity()){ form.reportValidity(); return; }
   const data = {}; new FormData(form).forEach((v,k)=>data[k]=v);
-  if (!data.Password) delete data.Password; // don't overwrite an existing password with a blank one
+  if (!data.Password) delete data.Password;
   else if (data.Password.length < 6){ showToast('Password must be at least 6 characters', true); return; }
   const btn = document.getElementById('saveAgentBtn'); btn.disabled = true; btn.textContent = 'Saving…';
   try{
