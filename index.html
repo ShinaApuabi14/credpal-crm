@@ -212,6 +212,11 @@ window.__libsReady = Promise.all([
   .mapping-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; margin:18px 0;}
   .mapping-field label{display:block; font-size:11.5px; color:var(--text-dim); margin-bottom:5px;}
   .mapping-field select{width:100%;}
+  .mapping-field.locked select{opacity:.6; cursor:not-allowed; background:var(--surface-3);}
+  .lock-badge{font-size:10.5px; opacity:.85;}
+  .mapping-lock-hint{font-size:10.5px; color:var(--text-faint); margin-top:5px;}
+  .field.locked label{display:flex; align-items:center; gap:5px;}
+  input[readonly]{opacity:.6; cursor:not-allowed; background:var(--surface-2);}
   .import-summary{display:flex; gap:16px; margin:14px 0; font-size:12.5px; color:var(--text-dim);}
   .import-summary b{color:var(--text);}
   .progress-track{height:6px; background:var(--surface-2); border-radius:4px; overflow:hidden; margin-top:12px;}
@@ -699,6 +704,10 @@ window.__libsReady = Promise.all([
             <label>Status Updated At</label>
             <input type="datetime-local" name="Status Updated At" id="leadStatusUpdatedInput" />
           </div>
+          <div class="field locked">
+            <label>Created At <span class="lock-badge" title="System-generated — mapped from Lead Source on import, not editable">🔒</span></label>
+            <input type="datetime-local" name="Created_at" id="leadCreatedAtInput" readonly />
+          </div>
           <div class="field"><label>Follow-up / Close Date</label><input type="date" name="FOLLOW - UP DATE / CLOSE DATE" /></div>
           <div class="field full"><label>Feedback</label><textarea name="FEED BACK"></textarea></div>
           <div class="field full"><label>Note</label><textarea name="NOTE"></textarea></div>
@@ -768,7 +777,10 @@ const LEAD_HEADERS = [
   'ASSIGNMENTS','Agents','User_ID','Customer Name','Phone Number','Email','Salary','Credit Limit',
   'Selfie Verified At','Created_at','CONTACT DATE','CALL STATUS','Status Updated At','FEED BACK','NOTE','FOLLOW - UP DATE / CLOSE DATE'
 ];
-const IMPORTABLE_HEADERS = LEAD_HEADERS.filter(h => h !== 'Created_at');
+const IMPORTABLE_HEADERS = LEAD_HEADERS.slice();
+// Fields whose CSV mapping is fixed (not user-editable in the import UI) — always
+// pulled from a specific source column when present, rather than left to the user to pick.
+const LOCKED_MAPPING_SOURCES = { 'Created_at': 'Lead Source' };
 
 const CALL_STATUSES = ['Not Contacted','Answered - Interested','Answered - Not Interested','No Answer','Switched Off / Unreachable','Wrong Number','Call Back Later','Converted'];
 const STATUS_COLORS = {
@@ -1528,7 +1540,8 @@ function normalizeHeader(h){ return (h||'').toString().toLowerCase().replace(/[^
 function buildMapping(){
   columnMapping = {};
   IMPORTABLE_HEADERS.forEach(target => {
-    const normTarget = normalizeHeader(target);
+    const sourceName = LOCKED_MAPPING_SOURCES[target] || target;
+    const normTarget = normalizeHeader(sourceName);
     const match = csvHeaders.find(h => normalizeHeader(h) === normTarget);
     columnMapping[target] = match || '';
   });
@@ -1538,15 +1551,20 @@ function buildMapping(){
 
 function renderMappingGrid(){
   const grid = document.getElementById('mappingGrid');
-  grid.innerHTML = IMPORTABLE_HEADERS.map(target => `
-    <div class="mapping-field">
-      <label>${escapeHtml(target)}</label>
-      <select data-target="${escapeHtml(target)}">
+  grid.innerHTML = IMPORTABLE_HEADERS.map(target => {
+    const locked = !!LOCKED_MAPPING_SOURCES[target];
+    const sourceName = LOCKED_MAPPING_SOURCES[target] || target;
+    return `
+    <div class="mapping-field${locked ? ' locked' : ''}">
+      <label>${escapeHtml(target)}${locked ? ` <span class="lock-badge" title="Always mapped from &quot;${escapeHtml(sourceName)}&quot; — not user-editable">🔒</span>` : ''}</label>
+      <select data-target="${escapeHtml(target)}" ${locked ? 'disabled' : ''}>
         <option value="">— skip —</option>
         ${csvHeaders.map(h => `<option value="${escapeHtml(h)}" ${columnMapping[target]===h?'selected':''}>${escapeHtml(h)}</option>`).join('')}
       </select>
-    </div>`).join('');
-  grid.querySelectorAll('select').forEach(sel => {
+      ${locked ? `<div class="mapping-lock-hint">Locked — always sourced from "${escapeHtml(sourceName)}"</div>` : ''}
+    </div>`;
+  }).join('');
+  grid.querySelectorAll('select:not([disabled])').forEach(sel => {
     sel.addEventListener('change', () => { columnMapping[sel.dataset.target] = sel.value; renderPreview(); });
   });
 }
